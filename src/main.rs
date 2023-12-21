@@ -1,18 +1,17 @@
-mod users;
-
 use actix_web::{web, App, HttpServer};
-
+mod db;
+mod models;
+mod schema;
+mod controllers;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "actix_web=debug");
+    std::env::set_var("rust_log", "actix_web=debug");
     HttpServer::new(|| {
         App::new()
-            .configure(users::config)
-            .configure(auth::config)
+            .service(web::scope("/users").configure(controllers::users::config))
+            .service(web::scope("/auth").configure(controllers::auth::config))
     })
     .bind("127.0.0.1:8080")?
     .run()
-    .await
-}
-
+    .await}
