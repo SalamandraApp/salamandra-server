@@ -25,7 +25,7 @@ async fn search_exercise(term: web::Path<String>) -> impl Responder {
 
     }).await {
         Ok(Err(DieselError::NotFound)) => {
-            "No hay ninguno con ese nombre, ha saltado DieselError::NotFound"
+            HttpResponse::Ok().body("No hay ninguno con ese nombre, ha saltado DieselError::NotFound")
         },
         Ok(Ok(result)) => {
             HttpResponse::Ok().json(result)
