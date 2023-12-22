@@ -11,6 +11,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .service(web::scope("/users").configure(controllers::users::config))
             .service(web::scope("/auth").configure(controllers::auth::config))
+            .service(web::scope("/exercises").configure(controllers::exercises::config))
     })
     .bind("127.0.0.1:8080")?
     .run()

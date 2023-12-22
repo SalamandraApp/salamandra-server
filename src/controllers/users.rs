@@ -6,11 +6,11 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 }
 
 async fn list_users() -> impl Responder {
-    HttpResponse::Ok().body("List users is not implemented")
+    "List users is not implemented"
 }
 
 async fn get_user() -> impl Responder {
-    HttpResponse::Ok().body("Get user is not implemented")
+    "Get user is not implemented"
 }
 
 
