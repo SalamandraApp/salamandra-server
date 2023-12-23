@@ -964,6 +964,7 @@ dependencies = [
  "dotenv",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]

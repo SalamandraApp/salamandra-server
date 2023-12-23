@@ -1,5 +1,6 @@
 -- Your SQL goes here
 CREATE TABLE users (
-    username VARCHAR(32) PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(32) NOT NULL,
     password VARCHAR(64) NOT NULL
 )
