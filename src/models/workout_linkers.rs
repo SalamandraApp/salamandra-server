@@ -8,15 +8,15 @@ use crate::models::workouts::Workout;
 #[diesel(table_name = crate::schema::workout_linkers)]
 #[diesel(check_for_backend(diesel::mysql::Mysql))]
 pub struct WorkoutLinker {
-    pub id: u64,
-    pub workout_id: u64,
-    pub exercise_id: u64,
+    pub id: i32,
+    pub workout_id: i32,
+    pub exercise_id: i32,
 }
 
 
 #[derive(Insertable)]
 #[diesel(table_name = crate::schema::workout_linkers)]
 pub struct NewWorkoutLinker {
-    pub workout_id: u64,
-    pub exercise_id: u64,
+    pub workout_id: i32,
+    pub exercise_id: i32,
 }

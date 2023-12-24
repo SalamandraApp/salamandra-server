@@ -24,7 +24,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 
 #[derive(Deserialize)]
 pub struct ExercisePayload {
-    exercise_ids: Vec<u64>,
+    exercise_ids: Vec<i32>,
 }
 
 async fn list_users() -> impl Responder {
@@ -46,7 +46,7 @@ async fn add_workout(
     // Should check JWL token
     // After that should also check that user_id exists
     // For the next phase
-    let user: u64 = match user_str.parse::<u64>() {
+    let user: i32 = match user_str.parse::<u64>() {
         Ok(user) => user,
         Err(_) => {
             return HttpResponse::BadRequest().json(json!({"error": "Invalid exercise_id format"}));
@@ -54,8 +54,8 @@ async fn add_workout(
     };
     
     // Remove duplicates
-    let unique_ids: HashSet<u64> = payload.exercise_ids.iter().cloned().collect();
-    let exercise_id_set: Vec<u64> = unique_ids.into_iter().collect();
+    let unique_ids: HashSet<i32> = payload.exercise_ids.iter().cloned().collect();
+    let exercise_id_set: Vec<i32> = unique_ids.into_iter().collect();
 
     let result = task::spawn_blocking(move || {
         use crate::db::establish_connection;
@@ -79,7 +79,7 @@ async fn add_workout(
             .values(&new_workout)          
             .execute(conn);
 
-        let new_workout_id: u64 = match sql_query("SELECT LAST_INSERT_ID()")
+        let new_workout_id: i32 = match sql_query("SELECT LAST_INSERT_ID()")
             .get_result(conn) {
             Ok(new_id) => new_id,
             Err(_) => {

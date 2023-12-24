@@ -5,6 +5,6 @@ use serde::Serialize;
 #[diesel(table_name = crate::schema::exercises)]
 #[diesel(check_for_backend(diesel::mysql::Mysql))]
 pub struct Exercise {
-    pub id: u64,
+    pub id: i32,
     pub name: String,
 }

@@ -1,24 +1,16 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    exercise_workout (id) {
-        id -> Unsigned<Bigint>,
-        workout_id -> Unsigned<Bigint>,
-        exercise_id -> Unsigned<Bigint>,
-    }
-}
-
-diesel::table! {
     exercises (id) {
-        id -> Unsigned<Bigint>,
-        #[max_length = 32]
+        id -> Int4,
+        #[max_length = 64]
         name -> Varchar,
     }
 }
 
 diesel::table! {
     users (id) {
-        id -> Unsigned<Bigint>,
+        id -> Int4,
         #[max_length = 64]
         username -> Varchar,
         #[max_length = 64]
@@ -28,27 +20,24 @@ diesel::table! {
 
 diesel::table! {
     workout_linkers (id) {
-        id -> Unsigned<Bigint>,
-        workout_id -> Unsigned<Bigint>,
-        exercise_id -> Unsigned<Bigint>,
+        id -> Int4,
+        workout_id -> Int4,
+        exercise_id -> Int4,
     }
 }
 
 diesel::table! {
     workouts (id) {
-        id -> Unsigned<Bigint>,
-        user_id -> Unsigned<Bigint>,
+        id -> Int4,
+        user_id -> Int4,
     }
 }
 
-diesel::joinable!(exercise_workout -> exercises (exercise_id));
-diesel::joinable!(exercise_workout -> workouts (workout_id));
 diesel::joinable!(workout_linkers -> exercises (exercise_id));
 diesel::joinable!(workout_linkers -> workouts (workout_id));
 diesel::joinable!(workouts -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    exercise_workout,
     exercises,
     users,
     workout_linkers,
