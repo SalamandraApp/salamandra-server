@@ -19,10 +19,18 @@ diesel::table! {
 diesel::table! {
     users (id) {
         id -> Unsigned<Bigint>,
-        #[max_length = 32]
+        #[max_length = 64]
         username -> Varchar,
         #[max_length = 64]
         password -> Varchar,
+    }
+}
+
+diesel::table! {
+    workout_linkers (id) {
+        id -> Unsigned<Bigint>,
+        workout_id -> Unsigned<Bigint>,
+        exercise_id -> Unsigned<Bigint>,
     }
 }
 
@@ -35,11 +43,14 @@ diesel::table! {
 
 diesel::joinable!(exercise_workout -> exercises (exercise_id));
 diesel::joinable!(exercise_workout -> workouts (workout_id));
+diesel::joinable!(workout_linkers -> exercises (exercise_id));
+diesel::joinable!(workout_linkers -> workouts (workout_id));
 diesel::joinable!(workouts -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     exercise_workout,
     exercises,
     users,
+    workout_linkers,
     workouts,
 );

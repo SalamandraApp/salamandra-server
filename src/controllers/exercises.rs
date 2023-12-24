@@ -1,8 +1,11 @@
-use crate::models::exercises::Exercise;
-use crate::schema::exercises::dsl::*;
-use diesel::prelude::*;
 use actix_web::{web, HttpResponse, Responder};
 use tokio::task;
+
+use diesel::prelude::*;
+
+use crate::models::exercises::Exercise;
+use crate::schema::exercises::dsl::*;
+
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.route("", web::get().to(list_exercises))

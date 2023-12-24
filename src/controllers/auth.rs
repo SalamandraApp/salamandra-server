@@ -1,13 +1,16 @@
-use crate::models::users::User;
-use crate::schema::users::dsl::*;
-use diesel::prelude::*;
-use diesel::insert_into;
-use diesel::result::Error as DieselError;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
 use serde_json::json;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use tokio::task;
+
+use diesel::prelude::*;
+use diesel::insert_into;
+use diesel::result::Error as DieselError;
+
+use crate::models::users::{User, NewUser};
+use crate::schema::users::dsl::*;
+
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.route("/login", web::post().to(login))
@@ -41,11 +44,17 @@ async fn register(register_info: web::Json<RegisterRequest>) -> HttpResponse {
             if user_exists {
                 Err(DieselError::NotFound) 
             } else {
-                let hashed_password = hash(password_ref, DEFAULT_COST).unwrap();                
+                let hashed_password = hash(password_ref, DEFAULT_COST).unwrap();
+
+                let new_user = NewUser {
+                    username: username_ref,
+                    password: hashed_password,
+                    // joined: date...
+                };
+
                 insert_into(users)
-                    .values((username.eq(username_ref), password.eq(hashed_password)))
+                    .values(&new_user)
                     .execute(conn)
-                    .map_err(|e| e.into())
             }
         }
     }).await;
@@ -63,11 +72,11 @@ async fn login(login_info: web::Json<LoginRequest>) -> HttpResponse {
     let query_result = web::block({
         let username_ref = login_info.username.clone();
         move || {
-        use crate::db::establish_connection;
-        let conn = &mut establish_connection();
+            use crate::db::establish_connection;
+            let conn = &mut establish_connection();
 
-        users.filter(username.eq(username_ref))
-            .first::<User>(conn)
+            users.filter(username.eq(username_ref))
+                .first::<User>(conn)
         }
     }).await;
 
