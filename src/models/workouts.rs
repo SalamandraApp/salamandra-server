@@ -4,7 +4,7 @@ use crate::models::users::User;
 #[derive(Associations, Identifiable)]
 #[diesel(belongs_to(User))]
 #[diesel(table_name = crate::schema::workouts)]
-#[diesel(check_for_backend(diesel::mysql::Mysql))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Workout {
     pub id: i32,
     pub user_id: i32,

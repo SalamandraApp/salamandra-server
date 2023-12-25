@@ -5,7 +5,7 @@ use tokio::task;
 use std::collections::HashSet;
 
 use diesel::prelude::*;
-use diesel::{insert_into, sql_query};
+use diesel::insert_into;
 
 use crate::models::workout_linkers::NewWorkoutLinker;
 use crate::schema::workout_linkers::dsl::*;
@@ -39,6 +39,12 @@ async fn get_workout(_username: web::Path<String>) -> impl Responder {
     "Get workouts is not yet implemented"
 }
 
+enum WorkoutResult {
+    Success(i32),
+    BadRequest,
+    InternalError,
+}
+
 async fn add_workout(
     user_str: web::Path<String>, 
     payload: web::Json<ExercisePayload>) -> HttpResponse {
@@ -46,10 +52,10 @@ async fn add_workout(
     // Should check JWL token
     // After that should also check that user_id exists
     // For the next phase
-    let user: i32 = match user_str.parse::<u64>() {
+    let user: i32 = match user_str.parse::<i32>() {
         Ok(user) => user,
         Err(_) => {
-            return HttpResponse::BadRequest().json(json!({"error": "Invalid exercise_id format"}));
+            return HttpResponse::BadRequest().json(json!({"error": "Non existing exercise ids"}));
         }
     };
     
@@ -58,32 +64,40 @@ async fn add_workout(
     let exercise_id_set: Vec<i32> = unique_ids.into_iter().collect();
 
     let result = task::spawn_blocking(move || {
+       
         use crate::db::establish_connection;
         let conn = &mut establish_connection();
 
         // Count how many of the given ids are in the DB
-        let count = exercises_dsl::exercises.filter(exercises_dsl::id.eq_any(exercise_id_set))
+        let result = exercises_dsl::exercises.filter(exercises_dsl::id.eq_any(exercise_id_set.clone()))
             .count()
-            .get_result(conn);
-        // If different from the ids given, bad request
-        if count as usize != payload.exercise_ids.len() {
-            return HttpResponse::BadRequest().json(json!({"error": "Some ids don't correspond to exercises"}));
-        }
-        
-        let new_workout = NewWorkout {
+            .get_result::<i64>(conn);
+
+        match result {
+            
+            Ok(count) => {
+                if count as usize != payload.exercise_ids.len() {
+                    return WorkoutResult::BadRequest;
+                }
+            },
+            Err(_) => {
+                return WorkoutResult::BadRequest;
+            }
+        };
+
+       let new_workout = NewWorkout {
             user_id: user,
             // created: date...
         };
         // Insert new workout and get the id it was given
-        insert_into(workouts_dsl::workouts)
-            .values(&new_workout)          
-            .execute(conn);
-
-        let new_workout_id: i32 = match sql_query("SELECT LAST_INSERT_ID()")
-            .get_result(conn) {
-            Ok(new_id) => new_id,
+        let insert_result = insert_into(workouts_dsl::workouts)
+            .values(&new_workout)
+            .returning(workouts_dsl::id)
+            .get_result(conn);
+        let new_workout_id = match insert_result {
+            Ok(num) => num,
             Err(_) => {
-                return HttpResponse::InternalServerError().finish();
+                return WorkoutResult::InternalError;
             }
         };
 
@@ -94,16 +108,24 @@ async fn add_workout(
                 workout_id: new_workout_id,
             }
         }).collect();
-        insert_into(workout_linkers)
+        match insert_into(workout_linkers)
             .values(&new_linkers)
-            .execute(conn);
+            .execute(conn) {
+            
+            Ok(_) => {},
+            Err(_) => {
+                return WorkoutResult::InternalError;
+            }
+        };
 
-        new_workout_id
+        WorkoutResult::Success(new_workout_id)    
     }).await;
 
-    HttpResponse::Ok().body("pum")
-
-}
+    match result {
+    Ok(WorkoutResult::Success(new_id)) => HttpResponse::Ok().json(json!({"workout_id": new_id})),
+    Ok(WorkoutResult::BadRequest) => HttpResponse::BadRequest().json(json!({"error": "Non existing exercise ids"})),
+    Ok(WorkoutResult::InternalError) | Err(_) => HttpResponse::InternalServerError().finish(),
+}}
 
 
 

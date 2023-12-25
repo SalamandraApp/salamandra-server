@@ -1,4 +1,4 @@
-use diesel::mysql::PgConnection;
+use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenv::dotenv;
 use std::env;
