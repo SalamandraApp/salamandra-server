@@ -60,8 +60,8 @@ async fn register(register_info: web::Json<RegisterRequest>) -> HttpResponse {
     }).await;
 
     match query_result {
-        Ok(Ok(_)) => HttpResponse::Ok().json(json!({"username": register_info.username})),
-        Ok(Err(DieselError::NotFound)) => HttpResponse::BadRequest().json(json!({"error": "User already exists"})),
+        Ok(Ok(_)) => HttpResponse::Ok().json(json!({"error": "None", "token": "Your JWT token"})),
+        Ok(Err(DieselError::NotFound)) => HttpResponse::BadRequest().json(json!({"error": "User already exists", "token": "None"})),
         Ok(Err(_)) | Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
@@ -82,15 +82,15 @@ async fn login(login_info: web::Json<LoginRequest>) -> HttpResponse {
 
     match query_result {
         Ok(Err(DieselError::NotFound)) => {
-            HttpResponse::BadRequest().json(json!({"error": "User not found"}))
+            HttpResponse::BadRequest().json(json!({"error": "User not found", "token": "None"}))
         },
         Ok(Ok(user)) => {
             match verify(&login_info.password, &user.password) {
                 Ok(matches) => {
                     if matches {
-                        HttpResponse::Ok().json(json!({"token": "Your JWT token"}))
+                        HttpResponse::Ok().json(json!({"error": "None", "token": "Your JWT token"}))
                     } else {
-                        HttpResponse::Unauthorized().json(json!({"error": "Incorrect password"}))
+                        HttpResponse::Unauthorized().json(json!({"error": "Incorrect password", "token": "None"}))
                     }
                 }
                 Err(_) => {
