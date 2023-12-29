@@ -37,8 +37,8 @@ async fn add_exercise(new_exercise: web::Json<AddExercise>) -> HttpResponse {
 
             let insert_result = insert_into(exercises_dsl::exercises)
                 .values(&latest_exercise)
-                .returning(exercises_dsl::id)
-                .get_result::<i32>(conn);
+                .returning((exercises_dsl::id, exercises_dsl::name))
+                .get_result::<(i32, String)>(conn);
 
             match insert_result {
                 Ok(num) => Ok(num),
