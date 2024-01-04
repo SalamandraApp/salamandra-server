@@ -60,8 +60,8 @@ async fn register(register_info: web::Json<RegisterRequest>) -> HttpResponse {
     }).await;
 
     match query_result {
-        Ok(Ok(_)) => HttpResponse::Ok().json(json({"error": "None", "token": "Your JWT token"})),
-        Ok(Err(DieselError::NotFound)) => HttpResponse::BadRequest().body("User already exits")
+        Ok(Ok(_)) => HttpResponse::Ok().json(json!({"error": "None", "token": "Your JWT token"})),
+        Ok(Err(DieselError::NotFound)) => HttpResponse::BadRequest().body("User already exits"),
         Ok(Err(_)) | Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
