@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse, Responder};
 use tokio::task;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use diesel::prelude::*;
 use diesel::insert_into;
@@ -11,6 +11,10 @@ use crate::schema::exercises::dsl as exercises_dsl;
 #[derive(Deserialize)]
 pub struct AddExercise {
     name: String,
+}
+#[derive(Serialize)]
+struct SearchResponse {
+    items: Vec<Exercise>,
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
@@ -64,7 +68,10 @@ async fn search_exercise(term: web::Path<String>) -> impl Responder {
     }).await;
 
     match result {
-        Ok(Ok(found_exercises)) => HttpResponse::Ok().json(found_exercises),
+        Ok(Ok(found_exercises)) => {
+            let response = SearchResponse { items: found_exercises };
+            HttpResponse::Ok().json(response)
+        }
         Err(_) | Ok(Err(_)) => HttpResponse::InternalServerError().finish(),
     }
 }
