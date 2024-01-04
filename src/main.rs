@@ -21,7 +21,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::scope("/auth").configure(controllers::auth::config))
             .service(web::scope("/exercises").configure(controllers::exercises::config))
     })
-    .bind("127.0.0.1:8080")?
+    .bind("127.0.0.1:5000")?
     .run()
     .await
 }
