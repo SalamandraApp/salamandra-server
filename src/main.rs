@@ -16,9 +16,7 @@ async fn main() -> std::io::Result<()> {
         .set_private_key_file("~/backend-certs/privkey.pem", SslFiletype::PEM)
         .unwrap();
     builder.set_certificate_chain_file("~/backend-certs/fullchain.pem").unwrap();
-    */
-
-    /*
+     
     FOR TESTING 
     `openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 365 -subj '/CN=localhost'`
     */
