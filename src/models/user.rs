@@ -1,11 +1,11 @@
 use diesel::prelude::*;
-use diesel::pg::sql_types::Uuid;
+use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 
-#[derive(Queryable, Serialize, Insertable)]
+#[derive(Queryable, Serialize)]
 #[diesel(table_name = crate::schema::users)]
 pub struct User {
-    // pub id: Uuid,
+    pub id: Uuid,
     pub username: String,
     pub display_name: Option<String>,
     pub pfp_url: Option<String>,
@@ -17,9 +17,9 @@ pub struct User {
 }
 
 #[derive(Deserialize)]
-#[diesel(table_name = crate::schema::users)]
 pub struct RegisteredUser {
-    // pub id: Uuid,
+    pub id: Uuid,
     pub username: String,
     pub display_name: Option<String>,
 }
+
