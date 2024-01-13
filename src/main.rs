@@ -4,7 +4,7 @@ use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 mod db;
 mod models;
 mod schema;
-mod controllers;
+mod handlers;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -28,7 +28,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(|| {
         App::new()
-            .service(web::scope("/users").configure(controllers::users::config))
+            .service(web::scope("/users").configure(handlers::users::config))
     })
     .bind_openssl("localhost:8080", builder)?
     .run()

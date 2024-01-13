@@ -1,13 +1,11 @@
 use actix_web::{web, Responder};
-use serde_json::json;
-use serde::{Serialize, Deserialize};
-use tokio::task;
+// use serde_json::json;
+// use tokio::task;
 
-use diesel::prelude::*;
-use diesel::insert_into;
+// use diesel::prelude::*;
+// use diesel::insert_into;
 
-use crate::models::user::{RegisteredUser, User};
-
+use crate::models::user::{RegisteredUser, User, AccessTokenClaims};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.route("/{user_id}", web::get().to(get_user))
@@ -17,7 +15,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 async fn get_user(_username: web::Path<String>) -> impl Responder {
     "Get user is not yet implemented"
 }
-
 
 async fn add_user(
     user_id: web::Path<String>, 
