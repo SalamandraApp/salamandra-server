@@ -1,8 +1,8 @@
 use diesel::prelude::*;
 use uuid::Uuid;
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
 
-#[derive(Queryable, Serialize)]
+#[derive(Queryable, Serialize, Insertable)]
 #[diesel(table_name = crate::schema::users)]
 pub struct User {
     pub id: Uuid,
@@ -14,12 +14,5 @@ pub struct User {
     pub training_state: i32,
     pub fitness_level: i32,
     pub height: Option<i32>,
-}
-
-#[derive(Deserialize)]
-pub struct RegisteredUser {
-    pub id: Uuid,
-    pub username: String,
-    pub display_name: Option<String>,
 }
 

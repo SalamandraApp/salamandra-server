@@ -1,15 +1,15 @@
-use jsonwebtoken::{decode, DecodingKey, Validation, errors::Result as JwtResult};
+use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm, errors::Result as JwtResult};
 use serde::Deserialize;
 use std::fs;
 
 #[derive(Deserialize)]
-struct AccessTokenClaims {
-    exp: i64,
+pub struct AccessTokenClaims {
+    pub exp: i64,
+    pub iss: String,
+    pub sub: String,
     iat: i64,
     jti: String,
-    iss: String,
     aud: String,
-    sub: String,
     typ: String,
     azp: String,
     session_state: String,
@@ -22,7 +22,7 @@ struct AccessTokenClaims {
     sid: String,
     email_verified: bool,
     #[serde(rename = "preferred_username")]
-    preferred_username: String,
+    pub preferred_username: String,
     email: String,
 }
 
@@ -41,7 +41,7 @@ struct AccountRoles {
     roles: Vec<String>,
 }
 
-pub fn handle_jwt(token: &str) -> JwtResult<AccessTokenClaims> {
+pub fn process_jwt(token: &str) -> JwtResult<AccessTokenClaims> {
     let public_key = fs::read_to_string("/keys/jwt_key.pem")
         .expect("Failed to read public key from file");
 

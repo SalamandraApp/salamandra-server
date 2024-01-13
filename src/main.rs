@@ -2,6 +2,7 @@ use actix_web::{web, App, HttpServer};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 
 mod db;
+mod utils;
 mod models;
 mod schema;
 mod handlers;
@@ -22,9 +23,9 @@ async fn main() -> std::io::Result<()> {
     */
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
     builder
-        .set_private_key_file("key.pem", SslFiletype::PEM)
+        .set_private_key_file("keys/key.pem", SslFiletype::PEM)
         .unwrap();
-    builder.set_certificate_chain_file("cert.pem").unwrap();
+    builder.set_certificate_chain_file("keys/cert.pem").unwrap();
 
     HttpServer::new(|| {
         App::new()
