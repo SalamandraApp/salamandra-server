@@ -2,14 +2,16 @@ use actix_web::{web, Responder, HttpRequest, HttpResponse};
 use serde_json::json;
 use tokio::task;
 use tokio::time::{self, Duration};
+use tokio::sync::Mutex;
+use std::sync::Arc;
 
 use diesel::prelude::*;
 use diesel::insert_into;
 
 use crate::schema::users::dsl::*;
-
 use crate::models::user::User;
 use crate::utils::auth::{process_jwt, AccessTokenClaims};
+use crate::utils::keycloak::KeycloakClient;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.route("/{user_id}", web::get().to(get_user))
@@ -20,7 +22,20 @@ async fn get_user(_username: web::Path<String>) -> impl Responder {
     "Get user is not yet implemented"
 }
 
-async fn add_user(req: HttpRequest) -> HttpResponse {
+
+/// Adds the user to the database 
+/// and schedules email verification check
+///
+/// # Arguments
+/// * JWT token in request
+///
+/// # Errors
+/// * Invalid/Unauthorized JWT
+/// * Invalid UUID
+/// * Expired token
+/// * Internal Server Errors
+async fn add_user(req: HttpRequest, 
+                  keycloak_client: web::Data<Arc<Mutex<KeycloakClient>>>) -> HttpResponse {
 
     // Extract header
     let auth_header = match req.headers().get("Authorization")
@@ -79,12 +94,14 @@ async fn add_user(req: HttpRequest) -> HttpResponse {
     }).await;
 
     match operation_result {
-        Err(_) | Ok(Err(_))=> HttpResponse::InternalServerError().json(json!({"error": "Placeholder"})),
+        Err(_) => HttpResponse::InternalServerError().json(json!({"error": "Unexpected error"})),
+        // Error with connection or insert
+        Ok(Err(_)) => HttpResponse::InternalServerError().json(json!({"error": "Service unavailable"})),
         Ok(_) => {
             let user_name = claims.preferred_username.clone();
             tokio::spawn(async move {
                 time::sleep(Duration::from_secs(12 * 3600)).await;
-                check_email_verified(user_name).await;
+                check_email_verified(user_name, keycloak_client).await;
             });
 
             HttpResponse::Created().finish()
@@ -92,6 +109,17 @@ async fn add_user(req: HttpRequest) -> HttpResponse {
     }
 }
 
-async fn check_email_verified(user_name: String) {
+/// Gets user info from KC and checks email verified
+/// If its not, deletes the user from KCs and our db
+/// Otherwise nothing
+///
+/// # Argument
+/// * username
+async fn check_email_verified(user_name: String, keycloak_client: web::Data<Arc<Mutex<KeycloakClient>>>) {
+
+    // Call KC
+    // Check email info
+    // Delete from KC
+    // Delete from out DB
 
 }
