@@ -11,15 +11,15 @@ use diesel::{insert_into, delete};
 use crate::schema::users::dsl::*;
 use crate::models::user::User;
 use crate::utils::auth::{process_jwt, AccessTokenClaims};
-use crate::utils::keycloak::{KeycloakClient, UserInfo};
+use crate::utils::keycloak::KeycloakClient;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.route("/{user_id}", web::get().to(get_user))
        .route("", web::post().to(add_user));
 }
 
-async fn get_user(_username: web::Path<String>) -> impl Responder {
-    "Get user is not yet implemented"
+pub async fn get_user(_username: web::Path<String>) -> impl Responder {
+    HttpResponse::NotImplemented().json(json!({"error": "Funcionality not yet implemented"}))
 }
 
 
@@ -34,7 +34,7 @@ async fn get_user(_username: web::Path<String>) -> impl Responder {
 /// * Invalid UUID
 /// * Expired token
 /// * Internal Server Errors
-async fn add_user(req: HttpRequest, 
+pub async fn add_user(req: HttpRequest, 
                   keycloak_client: web::Data<Arc<Mutex<KeycloakClient>>>) -> HttpResponse {
 
     // Extract header
@@ -42,7 +42,7 @@ async fn add_user(req: HttpRequest,
         .and_then(|hv| hv.to_str().ok())
         .and_then(|s| s.strip_prefix("Bearer ")) {
             Some(header) => header,
-            None => return HttpResponse::BadRequest().json(json!({"error": "Invalid JWT format"}))
+            None => return HttpResponse::BadRequest().finish(),
         };
 
     // Validate claims

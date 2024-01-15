@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::fs;
 
 pub fn process_jwt(token: &str) -> JwtResult<AccessTokenClaims> {
-    let public_key = fs::read_to_string("/keys/jwt_key.pem")
+    let public_key = fs::read_to_string("keys/jwt_key.pem")
         .expect("Failed to read public key from file");
 
     let validation = Validation::new(Algorithm::RS256);

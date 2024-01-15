@@ -4,11 +4,11 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use crate::utils::keycloak::KeycloakClient;
 
-mod db;
-mod utils;
-mod models;
-mod schema;
-mod handlers;
+pub mod db;
+pub mod utils;
+pub mod models;
+pub mod schema;
+pub mod handlers;
 
 pub async fn run() -> std::io::Result<()> {
     /*
