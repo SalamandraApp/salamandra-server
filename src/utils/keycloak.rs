@@ -36,7 +36,7 @@ impl KeycloakClient {
         let client_id: String = env::var("KC_CLIENT_ID").expect("KC_CLIENT_ID must be set");
         let client_secret: String = env::var("KC_CLIENT_SECRET").expect("KC_CLIENT_SECRET must be set");
 
-        // let url = format!("https://auth.salamandra-app.com/admin/realms/{}/users?username={}", realm_name, user_name);
+        // let url = format!("https://auth.salamandra-app.com/realms/{}/protocol/openid-connect/token", realm_name);
         let url = format!("http://localhost:8080/realms/{}/protocol/openid-connect/token", realm_name);
 
         let params = [
@@ -63,13 +63,8 @@ impl KeycloakClient {
             }
     }
 
-    // TODO
-    /// Given uuid, removes user from KC database 
-    async fn delete_user(&mut self, user_id: String) -> Result<(), KeycloakError> {
-        Err(KeycloakError::RequestError)
-    }
 
-    async fn get_user_info(&mut self, user_name: String) -> Result<UserInfo, KeycloakError> {
+    pub async fn get_user_info(&mut self, user_name: String) -> Result<UserInfo, KeycloakError> {
         dotenv().ok();
         let access_token: &String = self.get_token().await?;
         let client = reqwest::Client::new();
@@ -94,9 +89,33 @@ impl KeycloakClient {
             }
 
     }
+    
+    // TODO
+    /// Given uuid, removes user from KC database 
+    pub async fn delete_user(&mut self, user_id: String) -> Result<(), KeycloakError> {
+        dotenv().ok();
+        let access_token: &String = self.get_token().await?;
+        let client = reqwest::Client::new();
+        let realm_name: String = env::var("KC_REALM_NAME").expect("KC_REALM_NAME must be set");
+
+        // let url = format!("https://auth.salamandra-app.com/admin/realms/{}/users/{}", realm_name, id);
+        let url = format!("http://localhost:8080/admin/realms/{}/users/{}", realm_name, user_id);
+        match client.delete(url)
+            .header("Authorization", format!("Bearer {}", access_token))
+            .send()
+            .await {
+                Ok(response) => {
+                    if !response.status().is_success() {
+                        return Err(KeycloakError::RequestError)
+                    };
+                    Ok(())
+                },
+                Err(_) => Err(KeycloakError::RequestError),
+            }
+    }
 }
 
-enum KeycloakError {
+pub enum KeycloakError {
     RequestError,
     InternalServerError,
 }
@@ -116,11 +135,11 @@ struct NewTokenResponse {
 
 
 #[derive(Deserialize, Debug)]
-struct UserInfo {
+pub struct UserInfo {
+    pub id: String,
     #[serde(rename = "emailVerified")]
-    email_verified: bool,
+    pub email_verified: bool,
     /*
-    id: String,
     #[serde(rename = "createdTimestamp")]
     created_timestamp: i64,
     username: String,

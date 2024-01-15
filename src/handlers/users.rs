@@ -6,12 +6,12 @@ use tokio::sync::Mutex;
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use diesel::insert_into;
+use diesel::{insert_into, delete};
 
 use crate::schema::users::dsl::*;
 use crate::models::user::User;
 use crate::utils::auth::{process_jwt, AccessTokenClaims};
-use crate::utils::keycloak::KeycloakClient;
+use crate::utils::keycloak::{KeycloakClient, UserInfo};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.route("/{user_id}", web::get().to(get_user))
@@ -118,8 +118,44 @@ async fn add_user(req: HttpRequest,
 async fn check_email_verified(user_name: String, keycloak_client: web::Data<Arc<Mutex<KeycloakClient>>>) {
 
     // Call KC
-    // Check email info
-    // Delete from KC
-    // Delete from out DB
+    let mut client = keycloak_client.lock().await;
+    let user_id = match client.get_user_info(user_name).await {
+        Ok(info) => {
+            if info.email_verified {
+                return
+            }
+            info.id
+        },
+        Err(_) => return,
+    };
 
+    // Delete from KC
+    match client.delete_user(user_id.clone()).await {
+        Ok(_) => (),
+        // TODO
+        // logging
+        Err(_) => (),
+    }
+
+    // Delete from out DB
+    let user_uuid = match uuid::Uuid::parse_str(&user_id) {
+        Ok(user_id) => user_id,
+        // TODO
+        // logging
+        Err(_) => return,
+    };
+
+    match task::spawn_blocking(move || {
+        use crate::db::establish_connection;
+        let conn_result = establish_connection(); 
+        let mut conn = match conn_result {
+            Ok(connection) => connection,
+            Err(conn_err) => return Err(conn_err)
+        };
+
+        Ok(delete(users.filter(id.eq(user_uuid))).execute(&mut conn))
+    }).await {
+        Ok(_) => (),
+        Err(_) => (),
+    };
 }
