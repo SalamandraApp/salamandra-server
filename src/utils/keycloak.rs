@@ -3,6 +3,8 @@ use std::env;
 use dotenv::dotenv;
 use serde::Deserialize;
 
+// const DOMAIN: &str = "https://auth.salamandra-app.com"
+const DOMAIN: &str = "http://localhost:8080";
 
 pub struct KeycloakClient {
     pub token: Option<String>,
@@ -36,8 +38,7 @@ impl KeycloakClient {
         let client_id: String = env::var("KC_CLIENT_ID").expect("KC_CLIENT_ID must be set");
         let client_secret: String = env::var("KC_CLIENT_SECRET").expect("KC_CLIENT_SECRET must be set");
 
-        // let url = format!("https://auth.salamandra-app.com/realms/{}/protocol/openid-connect/token", realm_name);
-        let url = format!("http://localhost:8080/realms/{}/protocol/openid-connect/token", realm_name);
+        let url = format!("{}/realms/{}/protocol/openid-connect/token", DOMAIN, realm_name);
 
         let params = [
             ("grant_type", "client_credentials"),
@@ -52,14 +53,14 @@ impl KeycloakClient {
             .await {
                 Ok(response) => {
                     if !response.status().is_success() {
-                        return Err(KeycloakError::RequestError)
+                        return Err(KeycloakError::ResponseError(response.status().to_string()))
                     }
                     match response.json::<NewTokenResponse>().await {
                         Ok(new_token) => Ok(new_token),
                         Err(_) => Err(KeycloakError::InternalServerError)
                     }
                 },
-                Err(_) => Err(KeycloakError::RequestError),
+                Err(error) => Err(KeycloakError::RequestSendError(error.to_string())),
             }
     }
 
@@ -70,27 +71,25 @@ impl KeycloakClient {
         let client = reqwest::Client::new();
         let realm_name: String = env::var("KC_REALM_NAME").expect("KC_REALM_NAME must be set");
 
-        // let url = format!("https://auth.salamandra-app.com/admin/realms/{}/users?username={}", realm_name, user_name);
-        let url = format!("http://localhost:8080/admin/realms/{}/users?username={}", realm_name, user_name);
+        let url = format!("{}/admin/realms/{}/users?username={}", DOMAIN, realm_name, user_name);
         match client.get(url)
             .header("Authorization", format!("Bearer {}", access_token))
             .send()
             .await {
                 Ok(response) => {
                     if !response.status().is_success() {
-                        return Err(KeycloakError::RequestError)
+                        return Err(KeycloakError::ResponseError(response.status().to_string()))
                     }
                     match response.json::<UserInfo>().await {
                         Ok(user_info) => Ok(user_info),
                         Err(_) => Err(KeycloakError::InternalServerError)
                     }
                 },
-                Err(_) => Err(KeycloakError::RequestError),
+                Err(error) => Err(KeycloakError::RequestSendError(error.to_string())),
             }
 
     }
     
-    // TODO
     /// Given uuid, removes user from KC database 
     pub async fn delete_user(&mut self, user_id: String) -> Result<(), KeycloakError> {
         dotenv().ok();
@@ -98,25 +97,25 @@ impl KeycloakClient {
         let client = reqwest::Client::new();
         let realm_name: String = env::var("KC_REALM_NAME").expect("KC_REALM_NAME must be set");
 
-        // let url = format!("https://auth.salamandra-app.com/admin/realms/{}/users/{}", realm_name, id);
-        let url = format!("http://localhost:8080/admin/realms/{}/users/{}", realm_name, user_id);
+        let url = format!("{}/admin/realms/{}/users/{}", DOMAIN, realm_name, user_id);
         match client.delete(url)
             .header("Authorization", format!("Bearer {}", access_token))
             .send()
             .await {
                 Ok(response) => {
                     if !response.status().is_success() {
-                        return Err(KeycloakError::RequestError)
+                        return Err(KeycloakError::ResponseError(response.status().to_string()))
                     };
                     Ok(())
                 },
-                Err(_) => Err(KeycloakError::RequestError),
+                Err(error) => Err(KeycloakError::RequestSendError(error.to_string())),
             }
     }
 }
 
 pub enum KeycloakError {
-    RequestError,
+    RequestSendError(String),
+    ResponseError(String),
     InternalServerError,
 }
 
