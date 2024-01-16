@@ -1,5 +1,6 @@
 use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm, errors::Result as JwtResult};
 use serde::Deserialize;
+use uuid::Uuid;
 use std::fs;
 
 pub fn process_jwt(token: &str) -> JwtResult<AccessTokenClaims> {
@@ -20,7 +21,7 @@ pub fn process_jwt(token: &str) -> JwtResult<AccessTokenClaims> {
 pub struct AccessTokenClaims {
     pub exp: i64,
     pub iss: String,
-    pub sub: String,
+    pub sub: Uuid,
     #[serde(rename = "preferred_username")]
     pub preferred_username: String,
     /*

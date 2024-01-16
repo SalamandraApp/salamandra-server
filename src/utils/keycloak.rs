@@ -136,7 +136,7 @@ struct NewTokenResponse {
 
 #[derive(Deserialize, Debug)]
 pub struct UserInfo {
-    pub id: String,
+    pub id: uuid::Uuid,
     #[serde(rename = "emailVerified")]
     pub email_verified: bool,
     /*

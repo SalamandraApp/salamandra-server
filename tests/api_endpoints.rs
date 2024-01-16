@@ -1,11 +1,12 @@
 use actix_web::{web, App, test};
 use reqwest::StatusCode;
 use reqwest::header::AUTHORIZATION;
-use serde::Deserialize;
 use tokio::sync::Mutex;
 use std::sync::Arc;
 use salamandra_server::handlers::users::{get_user, add_user};
 use salamandra_server::utils::keycloak::KeycloakClient;
+
+mod common;
 
 #[actix_web::test]
 async fn test_get_user() {
@@ -18,7 +19,7 @@ async fn test_get_user() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::NOT_IMPLEMENTED);
 
-    let result: ErrorMessage = test::read_body_json(resp).await;
+    let result: common::ErrorMessage = test::read_body_json(resp).await;
     assert_eq!(result.error, "Funcionality not yet implemented");
 }
 
@@ -58,9 +59,6 @@ async fn test_add_user_bad_request() {
     assert_eq!(resp_3.status(), StatusCode::UNAUTHORIZED);
 }
 
-#[derive(Deserialize)]
-struct ErrorMessage {
-    error: String
-}
+
 
 
