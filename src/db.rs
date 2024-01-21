@@ -4,7 +4,7 @@ use tokio::task;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel::{insert_into, delete};
+use diesel::{insert_into};
 
 use crate::schema::users::dsl::*;
 use crate::models::user::User;
@@ -36,11 +36,12 @@ pub fn insert_new_user(new_user: User) -> Result<usize, DBError> {
         .map_err(|error| DBError::OperationError(error.to_string()))
 }
 
-pub fn delete_user(user_id: uuid::Uuid) -> Result<usize, DBError> {
+pub fn select_user(user_id: uuid::Uuid) -> Result<Vec<User>, DBError> {
     let conn = &mut establish_connection()?;
-    delete(users.filter(id.eq(user_id)))
-        .execute(conn)
-        .map_err(|error| DBError::OperationError(error.to_string()))
+    match users.filter(id.eq(user_id)).load::<User>(conn) {
+        Ok(vec) => Ok(vec),
+        Err(error) => Err(DBError::OperationError(error.to_string()))
+    }
 }
 
 
