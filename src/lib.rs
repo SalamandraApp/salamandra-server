@@ -16,9 +16,7 @@ pub async fn run() -> std::io::Result<()> {
         .unwrap();
     builder.set_certificate_chain_file("~/backend-certs/fullchain.pem").unwrap(); 
     */
-
-    
-    
+ 
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
     builder
         .set_private_key_file("keys/key.pem", SslFiletype::PEM)

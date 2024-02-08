@@ -9,6 +9,7 @@
 //!
 //! NOTE: These tests do not cover the internal logic or accuracy of the endpoints. 
 //! Only the interface layer, the communication of endpoints with clients.
+//! The inside is covered in integration/
 //!
 //! Test Naming
 //! test_<function>_<case>
@@ -17,9 +18,6 @@ use actix_web::{web, App, test};
 use reqwest::StatusCode;
 use reqwest::header::AUTHORIZATION;
 use salamandra_server::handlers::users::get_user;
-
-mod common;
-
 
 #[actix_web::test]
 async fn test_get_user_wrong_header() {

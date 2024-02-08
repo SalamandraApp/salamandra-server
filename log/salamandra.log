@@ -1,0 +1,24 @@
+2024-02-08T09:33:38.665584748-05:00 INFO actix_server::builder - starting 20 workers
+2024-02-08T09:33:38.665680312-05:00 INFO actix_server::server - Actix runtime found; starting in Actix runtime
+2024-02-08T09:33:39.758047220-05:00 INFO actix_server::server - SIGINT received; starting forced shutdown
+2024-02-08T09:33:39.758438925-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.758787630-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.759251967-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.759564871-05:00 INFO actix_server::accept - accept thread stopped
+2024-02-08T09:33:39.759940560-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.760201809-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.760561627-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.760923892-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.761344850-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.761696209-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.762023877-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.762338458-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.762593930-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.762824885-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.763120277-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.763407448-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.763655796-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.763849883-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.764101547-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.764286046-05:00 INFO actix_server::worker - shutting down idle worker
+2024-02-08T09:33:39.764511292-05:00 INFO actix_server::worker - shutting down idle worker
