@@ -9,6 +9,9 @@
 //!
 //! NOTE: These tests do not cover the internal logic or accuracy of the endpoints. 
 //! Only the interface layer, the communication of endpoints with clients.
+//!
+//! Test Naming
+//! test_<function>_<case>
 
 use actix_web::{web, App, test};
 use reqwest::StatusCode;
@@ -49,11 +52,3 @@ async fn test_get_user_wrong_header() {
     assert_eq!(resp_2.status(), StatusCode::BAD_REQUEST);
     assert_eq!(resp_3.status(), StatusCode::UNAUTHORIZED);
 }
-
-#[actix_web::test]
-async fn test_get_user_invalid_jwt() {
-
-}
-
-
-

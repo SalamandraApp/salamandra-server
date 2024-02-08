@@ -1,9 +1,10 @@
 use actix_web::{web, Responder, HttpRequest, HttpResponse};
 use serde_json::json;
-use crate::db::{execute_db_operation, insert_new_user, select_user};
 
+use crate::db::{execute_db_operation, insert_new_user, select_user};
 use crate::models::user::User;
 use crate::utils::auth::{handle_protected, ProtectedCallError};
+use crate::utils::log::log_db_error;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.route("/{user_id}", web::get().to(get_user));
@@ -14,7 +15,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 /// * Http request
 /// * User id
 ///
-/// # Retuns
+/// # Returns
 /// * Unsuccessful http response
 /// * User json for new or existing user
 pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl Responder {
@@ -39,10 +40,12 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
     };
 
     let url_uuid_ref = url_uuid.clone();
-    let select_result = match execute_db_operation(Box::new(move || select_user(url_uuid_ref))).await {
+    let select_result = match execute_db_operation(Box::new(move |conn| select_user(conn, url_uuid_ref))).await {
         Ok(vec) => vec,
-        // TODO: logging
-        Err(_) => return HttpResponse::InternalServerError().finish(),
+        Err(error) => {
+            log_db_error(error);
+            return HttpResponse::InternalServerError().finish()
+        }
     };
 
     // New user
@@ -63,19 +66,21 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
 
         // Insert into db
         let user_db = new_user.clone();
-        match execute_db_operation(Box::new(move || insert_new_user(user_db))).await {
-            Ok(_) => return HttpResponse::Created().json(new_user),
-            // TODO: logging
-            Err(_) => return HttpResponse::InternalServerError().finish(),
-        };
+        match execute_db_operation(Box::new(move |conn| insert_new_user(conn, user_db))).await {
+            Ok(_) => HttpResponse::Created().json(new_user),
+            Err(error) => {
+                log_db_error(error);
+                HttpResponse::InternalServerError().finish()
+            }
+        }
 
     }
     else if len == 1 {
         let user = select_result.first().unwrap(); 
-        return HttpResponse::Ok().json(user);
+        HttpResponse::Ok().json(user)
     }
     else {
         // TODO: logging
-        return HttpResponse::InternalServerError().finish()
+        HttpResponse::InternalServerError().finish()
     }
 }
