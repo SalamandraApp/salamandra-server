@@ -1,0 +1,48 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Install system dependencies
+      run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+
+    - name: Install Diesel CLI
+      run: cargo install diesel_cli --no-default-features --features postgres
+
+    - name: Run Diesel Migrations
+      run: diesel migration run --database-url=postgres://user:password@localhost:5432/testdb
+
+    - name: Build and test
+      run: cargo test
