@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn test_process_jwt_success_case() {
-
+        dotenv::dotenv().ok();
         // Generate and set up test keys
         let rsa = openssl::rsa::Rsa::generate(4096).expect("Failed to generate RSA key pair");
         let private_key_pem = rsa.private_key_to_pem().expect("Failed to convert to pem");
