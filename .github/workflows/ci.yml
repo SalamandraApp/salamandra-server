@@ -44,5 +44,8 @@ jobs:
     - name: Run Diesel Migrations
       run: diesel migration run --database-url=postgres://user:password@localhost:5432/testdb
 
+    - name: Create .env
+      run: touch .env
+
     - name: Build and test
       run: cargo test
