@@ -45,6 +45,7 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
         Ok(vec) => vec,
         Err(error) => {
             log_db_error(error);
+            println!("Error selecting");
             return HttpResponse::InternalServerError().finish()
         }
     };
@@ -72,6 +73,7 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
             Ok(_) => HttpResponse::Created().json(new_user),
             Err(error) => {
                 log_db_error(error);
+                println!("Error inserting");
                 HttpResponse::InternalServerError().finish()
             }
         }
@@ -83,6 +85,7 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
     }
     else {
         // TODO: logging
+        println!("Error selecting more than 2");
         HttpResponse::InternalServerError().finish()
     }
 }
