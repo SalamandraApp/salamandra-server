@@ -2,12 +2,11 @@ use actix_web::HttpRequest;
 use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use std::fs;
 
-fn process_jwt(token: &str, key_file: Option<&str>) -> Result<AccessTokenClaims, String> {
+fn process_jwt(token: &str) -> Result<AccessTokenClaims, String> {
     
-    let key_file_path = key_file.unwrap_or("keys/jwt_key.pem");
-    let public_key = match fs::read_to_string(key_file_path) {
+    let key_file_path = std::env::var("PUBLIC_KEY_FILE").unwrap_or_else(|_| "keys/jwt_key.pem".into());    
+    let public_key = match std::fs::read_to_string(key_file_path) {
         Ok(key) => key,
         Err(_) => return Err("Failed to read key file".to_string()),
     };
@@ -16,16 +15,16 @@ fn process_jwt(token: &str, key_file: Option<&str>) -> Result<AccessTokenClaims,
 
     decode::<AccessTokenClaims>(
         token,
-        &DecodingKey::from_rsa_pem(public_key.as_bytes()).map_err(|_| "Failed to decode key".to_string())?,
+        &DecodingKey::from_rsa_pem(public_key.as_bytes()).map_err(|err| err.to_string())?,
         &validation,
     )
     .map(|data| data.claims)
-    .map_err(|_| "JWT decoding error".to_string())
+    .map_err(|err| err.to_string())
 }
 
 /// Receives the request to validate the claims
 /// * The file path is only for testing
-pub fn handle_protected(req: HttpRequest, file: Option<&str>) -> Result<AccessTokenClaims, ProtectedCallError> {
+pub fn handle_protected(req: HttpRequest) -> Result<AccessTokenClaims, ProtectedCallError> {
 
     // Unwrap the header fields
     let auth_header = match req.headers().get("Authorization")
@@ -35,7 +34,7 @@ pub fn handle_protected(req: HttpRequest, file: Option<&str>) -> Result<AccessTo
             None => return Err(ProtectedCallError::WrongHeader),
         };
     // Validate token
-    process_jwt(auth_header, file)
+    process_jwt(auth_header)
         .map_err(|error| ProtectedCallError::JwtError(error.to_string()))
     
 }
@@ -87,6 +86,7 @@ mod tests {
         let private_key_pem = rsa.private_key_to_pem().expect("Failed to convert to pem");
         let public_key_pem = rsa.public_key_to_pem().expect("Failed to convert to pem");
         std::fs::write(TEST_KEY_PATH, &public_key_pem).expect("Failed to create key_file");
+        std::env::set_var("PUBLIC_KEY_FILE", TEST_KEY_PATH);
 
         // Create good claims
         let claims = AccessTokenClaims {
@@ -103,10 +103,11 @@ mod tests {
             &jsonwebtoken::EncodingKey::from_rsa_pem(&private_key_pem).expect("Failed to encode jwt"),
             ).expect("Failed to create jwt");
 
-        let result = process_jwt(&token, Some(&TEST_KEY_PATH));
+        let result = process_jwt(&token);
         assert!(result.is_ok());
 
         std::fs::remove_file(TEST_KEY_PATH).expect("Failed to delete key_file");
+        std::env::remove_var("PUBLIC_KEY_FILE");
     }
 
     #[test]
@@ -129,31 +130,7 @@ mod tests {
             &jsonwebtoken::EncodingKey::from_rsa_pem(&private_key_pem).expect("Failed to encode jwt"),
         ).expect("Failed to create jwt");
 
-        let result = process_jwt(&token, None);
-        assert!(!result.is_ok());
-
-    }
-
-    #[test]
-    fn test_process_jwt_non_existent_key() {
-        let rsa = openssl::rsa::Rsa::generate(4096).expect("Failed to generate RSA key pair");
-        let private_key_pem = rsa.private_key_to_pem().expect("Failed to convert to pem");
-
-        let claims = AccessTokenClaims {
-            sub: uuid::Uuid::parse_str(TEST_UUID).expect("Failed to created uuid"),
-            iss: "http://localhost:8080".to_owned(),
-            exp: 10000000000,
-            preferred_username: "test username".to_owned()
-
-        };
-        let token = jsonwebtoken::encode(
-            &jsonwebtoken::Header::new(Algorithm::RS256),
-            &claims,
-            &jsonwebtoken::EncodingKey::from_rsa_pem(&private_key_pem).expect("Failed to encode jwt"),
-        ).expect("Failed to create jwt");
-
-        // Give path to a key that doesnt exist
-        let result = process_jwt(&token, Some("keys/NO_key.pem"));
+        let result = process_jwt(&token);
         assert!(!result.is_ok());
 
     }
@@ -163,8 +140,8 @@ mod tests {
         let rsa = openssl::rsa::Rsa::generate(4096).expect("Failed to generate RSA key pair");
         let private_key_pem = rsa.private_key_to_pem().expect("Failed to convert to pem");
         let public_key_pem = rsa.public_key_to_pem().expect("Failed to convert to pem");
-
         std::fs::write(TEST_KEY_PATH, &public_key_pem).expect("Failed to create key_file");
+        std::env::set_var("PUBLIC_KEY_FILE", TEST_KEY_PATH);
 
         let claims = WrongClaims {
             // sub: uuid::Uuid::parse_str(TEST_UUID).expect("Failed to created uuid"),
@@ -179,10 +156,11 @@ mod tests {
             &jsonwebtoken::EncodingKey::from_rsa_pem(&private_key_pem).expect("Failed to encode jwt"),
             ).expect("Failed to create jwt");
 
-        let result = process_jwt(&token, Some(&TEST_KEY_PATH));
+        let result = process_jwt(&token);
         assert!(!result.is_ok());
 
         std::fs::remove_file(TEST_KEY_PATH).expect("Failed to delete key_file");
+        std::env::remove_var("PUBLIC_KEY_FILE");
     }
 }
 

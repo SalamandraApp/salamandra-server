@@ -9,6 +9,8 @@ use diesel::Connection;
 use salamandra_server::models::user::User;
 use salamandra_server::db::{establish_connection, insert_new_user, select_user};
 
+mod common;
+
 const TEST_UUID: uuid::Uuid = uuid::Uuid::from_bytes([
     0x12, 0x3e, 0x45, 0x67,             // first group: 123e4567
     0xe8, 0x9b,                         // second group: e89b
@@ -20,6 +22,8 @@ const TEST_UUID: uuid::Uuid = uuid::Uuid::from_bytes([
 
 #[test]
 fn test_insert_new_user_sucess() {
+    
+    common::set_up_test_db();
     let conn = &mut establish_connection().unwrap();
 
     conn.test_transaction::<_, diesel::result::Error, _>(|conn| {
@@ -45,12 +49,15 @@ fn test_insert_new_user_sucess() {
         assert_eq!(read_res.unwrap().len(), 1, "Expected one user to be found");
         Ok(())
     });
+    common::clean_up_test_db();
 }
 
 #[test]
 fn test_select_user_existing_user() {
-    let conn = &mut establish_connection().unwrap();
 
+    common::set_up_test_db();
+    let conn = &mut establish_connection().unwrap(); 
+    
     conn.test_transaction::<_, diesel::result::Error, _>(|conn| {
         // Create a new user object to insert
         let new_user = User {
@@ -77,11 +84,14 @@ fn test_select_user_existing_user() {
 
         Ok(())
     });
+    common::clean_up_test_db();
 }
 
 
 #[test]
 fn test_select_user_non_existing_user() {
+    
+    common::set_up_test_db();
     let conn = &mut establish_connection().unwrap();
 
     conn.test_transaction::<_, diesel::result::Error, _>(|conn| {
@@ -93,4 +103,5 @@ fn test_select_user_non_existing_user() {
 
         Ok(())
     });
+    common::clean_up_test_db();
 }

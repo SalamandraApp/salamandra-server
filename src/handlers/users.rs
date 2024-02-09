@@ -20,11 +20,13 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 /// * User json for new or existing user
 pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl Responder {
     
-    let claims = match handle_protected(req, None) {
+    let claims = match handle_protected(req) {
         Ok(claims) => claims,
         Err(error) => match error {
             ProtectedCallError::WrongHeader => return HttpResponse::BadRequest().json(json!({"error": "Invalid header format"})),
-            ProtectedCallError::JwtError(_log) => return HttpResponse::Unauthorized().finish()
+            ProtectedCallError::JwtError(_) => {
+                return HttpResponse::Unauthorized().finish()
+            }
         }
     };
     let url_uuid = match uuid::Uuid::parse_str(&url_user_id) {
@@ -39,8 +41,7 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
         }
     };
 
-    let url_uuid_ref = url_uuid.clone();
-    let select_result = match execute_db_operation(Box::new(move |conn| select_user(conn, url_uuid_ref))).await {
+    let select_result = match execute_db_operation(Box::new(move |conn| select_user(conn, url_uuid))).await {
         Ok(vec) => vec,
         Err(error) => {
             log_db_error(error);
@@ -50,6 +51,7 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
 
     // New user
     let len = select_result.len();
+    print!("This many users {}", len);
     if len == 0 {
         let user_name = claims.preferred_username.clone(); 
         let new_user = User {
