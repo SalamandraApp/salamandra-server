@@ -9,7 +9,8 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
+    env:
+      TEST_DATABASE_URL: postgres://user:password@localhost:5432/testdb
     services:
       postgres:
         image: postgres:latest

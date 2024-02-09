@@ -70,6 +70,7 @@ async fn test_get_user_wrong_url_user_id() {
 
     assert_eq!(resp_1.status(), StatusCode::BAD_REQUEST);
     assert_eq!(resp_2.status(), StatusCode::UNAUTHORIZED);
+    common::clean_up_test_key();
 }
 
 
@@ -80,7 +81,6 @@ async fn test_get_user_new_user() {
         .route("/users/{id}", web::get().to(get_user))
         ).await;
 
-    common::set_up_test_db();
     let private_key = common::set_up_test_key();
     let token = common::get_test_token(private_key, None);
     
@@ -95,7 +95,6 @@ async fn test_get_user_new_user() {
 
     common::remove_user(None).await;
     common::clean_up_test_key(); 
-    common::clean_up_test_db();
 }
 
 
@@ -106,7 +105,6 @@ async fn test_get_user_existing_user() {
         .route("/users/{id}", web::get().to(get_user))
         ).await;
 
-    common::set_up_test_db();
     let private_key = common::set_up_test_key();
     let existing_user = common::insert_user().await;
     let user_id = existing_user.id.clone();
@@ -123,5 +121,4 @@ async fn test_get_user_existing_user() {
 
     common::remove_user(Some(user_id)).await;
     common::clean_up_test_key(); 
-    common::clean_up_test_db();
 }

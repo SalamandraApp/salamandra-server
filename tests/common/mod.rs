@@ -27,15 +27,6 @@ pub fn clean_up_test_key() {
     std::env::remove_var("PUBLIC_KEY_FILE");
 }
 
-// ************************************************ DATABASE URL
-pub fn set_up_test_db() {
-    std::env::set_var("TEST_DATABASE_URL", TEST_DATABASE_URL);
-}
-
-pub fn clean_up_test_db() {
-    std::env::remove_var("TEST_DATABASE_URL");
-}
-
 
 // ************************************************ TOKENS
 pub fn get_test_token(private_key: Vec<u8>, user: Option<User>) -> String  {
