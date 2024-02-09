@@ -5,7 +5,7 @@ use salamandra_server::utils::auth::AccessTokenClaims;
 use salamandra_server::db::{execute_db_operation, insert_new_user, delete_user};
 use salamandra_server::models::user::User;
 
-const TEST_KEY_PATH: &str = "keys/test_jwt_key.pem";
+const TEST_KEY_PATH: &str = "test_jwt_key.pem";
 const TEST_DATABASE_URL: &str = "postgres://user:password@localhost:5432/testdb";
 
 pub const NEW_TEST_UUID: &str = "123e4567-e89b-12d3-a456-426614174000";
