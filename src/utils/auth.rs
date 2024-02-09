@@ -75,7 +75,7 @@ pub enum ProtectedCallError {
 #[cfg(test)]
 mod tests {
     use super::*; // Import symbols from the outer module
-    const TEST_KEY_PATH: &str = "keys/test_jwt_key.pem";
+    const TEST_KEY_PATH: &str = "test_jwt_key.pem";
     const TEST_UUID: &str = "123e4567-e89b-12d3-a456-426614174000";
 
     #[test]
