@@ -1,6 +1,31 @@
-# Rust Backend for Salamandra
+# Server for Salamandra App
 
-Built with Rust, Actix Web and Diesel. 
-It handles API requests, interacts with a database, and integrates with Keycloak for authentication.
+## Dependencies
+ - Install rust
+```
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+```
 
-<a > <img src="https://github.com/rust-lang/rust-artwork/blob/master/logo/rust-logo-128x128.png" alt="python" width="40" height="40"/> </a>
+ - Install diesel
+```bash
+cargo install diesel_cli --no-default-features --features postgres 
+```
+
+ - Install docker
+```bash
+curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+```
+
+ - Other neccesary packages
+```
+sudo apt-get update
+sudo apt-get install pkg-config libssl-dev libpq-dev docker-compose
+```
+
+## Testing locally
+```bash
+cd salamandra-server
+chmod +x test_local
+./test_local
+```
