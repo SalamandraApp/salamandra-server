@@ -45,5 +45,6 @@ jobs:
     - name: Run Diesel Migrations
       run: diesel migration run --database-url=postgres://user:password@localhost:5432/testdb
 
+    # To avoid race conditions, will fix the tests later
     - name: Build and test
-      run: RUST_BACKTRACE=1 cargo test
+      run: RUST_BACKTRACE=1 cargo test -- --test-threads=1

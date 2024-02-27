@@ -3,7 +3,7 @@ use serde_json::json;
 
 use crate::db::{execute_db_operation, insert_new_user, select_user};
 use crate::models::user::User;
-use crate::utils::auth::{handle_protected, ProtectedCallError};
+use crate::utils::auth::{handle_protected_call, ProtectedCallError};
 use crate::utils::log::log_db_error;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
@@ -20,41 +20,48 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 /// * User json for new or existing user
 pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl Responder {
     
-    let claims = match handle_protected(req) {
+    // TODO:
+    // - make new tests
+    // - update for new authentication
+    // - make possible to get other users
+    let claims = match handle_protected_call(req).await {
         Ok(claims) => claims,
         Err(error) => match error {
+            // TODO: logging
             ProtectedCallError::WrongHeader => return HttpResponse::BadRequest().json(json!({"error": "Invalid header format"})),
-            ProtectedCallError::JwtError(_) => {
+            ProtectedCallError::JwtError(mes) => {
+                println!("JWT Error: {}", mes);
+                return HttpResponse::Unauthorized().finish()
+            },
+            ProtectedCallError::ErrorGettingKey(mes) => {
+                println!("Error Getting Key: {}", mes);
                 return HttpResponse::Unauthorized().finish()
             }
         }
     };
     let url_uuid = match uuid::Uuid::parse_str(&url_user_id) {
-        Ok(url_uuid) => {
-            if url_uuid != claims.sub {
-                return HttpResponse::Unauthorized().json(json!({"error": "User id mismatch"}))
-            }
-            url_uuid
-        },
-        Err(_) => {
-            return HttpResponse::BadRequest().json(json!({"error": "Invalid user id format"}))
-        }
+        Ok(url_uuid) => url_uuid,
+        Err(_) => return HttpResponse::BadRequest().json(json!({"error": "Invalid user id format"})),
     };
 
     let select_result = match execute_db_operation(Box::new(move |conn| select_user(conn, url_uuid))).await {
         Ok(vec) => vec,
         Err(error) => {
             log_db_error(error);
-            println!("Error selecting");
             return HttpResponse::InternalServerError().finish()
         }
     };
 
     // New user
+    // TODO: 
+    // - change visivility of user struct if not getting own profile
     let len = select_result.len();
-    print!("This many users {}", len);
     if len == 0 {
-        let user_name = claims.preferred_username.clone(); 
+        // Looking for different user than one calling
+        if claims.sub != url_uuid {
+            return HttpResponse::NotFound().json(json!({"error" : "User not found"}))
+        }
+        let user_name = claims.nickname.clone(); 
         let new_user = User {
             id: claims.sub,
             username: user_name.clone(),
@@ -73,7 +80,6 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
             Ok(_) => HttpResponse::Created().json(new_user),
             Err(error) => {
                 log_db_error(error);
-                println!("Error inserting");
                 HttpResponse::InternalServerError().finish()
             }
         }

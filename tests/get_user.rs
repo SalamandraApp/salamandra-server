@@ -7,118 +7,370 @@
 
 use actix_web::{web, App, test};
 use reqwest::StatusCode;
-use reqwest::header::AUTHORIZATION;
+use jsonwebtoken as jwt;
+use mockito::Server;
+
 use salamandra_server::handlers::users::get_user;
-
-mod common;
+use salamandra_server::utils::{test as common, auth::AccessTokenClaims};
 
 #[actix_web::test]
-async fn test_get_user_wrong_header() {
+async fn test_get_user_same_user_new_sucess() {
+    // Create token
+    let mut server = Server::new_async().await;
+    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let now = chrono::Utc::now().timestamp() as u64; 
+    let user_uuid = uuid::Uuid::new_v4();
+    let claims = AccessTokenClaims {
+        sub: user_uuid,
+        nickname: "test".to_owned(),
+        email_verified: true,
+        iss: "test".to_owned(),
+        aud: "test".to_owned(),
+        exp: now + 100,
+        iat: now - 100,
+        token_use: "id".to_owned(),
+    };
+    let header = jwt::Header {
+        alg: jwt::Algorithm::RS256,
+        kid: Some(kid),
+        ..Default::default()
+    };
+    let token = jwt::encode(
+        &header,
+        &claims,
+        &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+
+    // Create test server
     let app = test::init_service(
         App::new()
         .route("/users/{id}", web::get().to(get_user))
         ).await;
 
-    // No authorization header
-    let req_1 = test::TestRequest::get()
-        .uri("/users/some_id")
-        .to_request();
-    let resp_1 = test::call_service(&app, req_1).await;
-
-    // Wrong format in authorization header
-    let req_2 = test::TestRequest::get()
-        .uri("/users/some_id")
-        .insert_header((AUTHORIZATION, "No Bearer tokenTOKEN"))
-        .to_request();
-    let resp_2 = test::call_service(&app, req_2).await;
-
-    // Incorrect token
-    let req_3 = test::TestRequest::get()
-        .uri("/users/some_id")
-        .insert_header((AUTHORIZATION, "Bearer notatokenatall"))
-        .to_request();
-    let resp_3 = test::call_service(&app, req_3).await;
-
-    assert_eq!(resp_1.status(), StatusCode::BAD_REQUEST);
-    assert_eq!(resp_2.status(), StatusCode::BAD_REQUEST);
-    assert_eq!(resp_3.status(), StatusCode::UNAUTHORIZED);
-}
-
-#[actix_web::test]
-async fn test_get_user_wrong_url_user_id() {
-    let app = test::init_service(
-        App::new()
-        .route("/users/{id}", web::get().to(get_user))
-        ).await;
-
-    let private_key = common::set_up_test_key();
-    let token = common::get_test_token(private_key, None);
-
-    // Not uuid format in URL
-    let req_1 = test::TestRequest::get()
-        .uri("/users/{WRONG-UUID}")
-        .insert_header((reqwest::header::AUTHORIZATION, format!("Bearer {}", token)))
-        .to_request();
-    let resp_1 = test::call_service(&app, req_1).await;
-
-    // Not uuid format in url
-    let req_2 = test::TestRequest::get()
-        .uri(format!("/users/{}", uuid::Uuid::new_v4().to_string()).as_str())
-        .insert_header((reqwest::header::AUTHORIZATION, format!("Bearer {}", token)))
-        .to_request();
-    let resp_2 = test::call_service(&app, req_2).await;
-
-    assert_eq!(resp_1.status(), StatusCode::BAD_REQUEST);
-    assert_eq!(resp_2.status(), StatusCode::UNAUTHORIZED);
-    common::clean_up_test_key();
-}
-
-
-#[actix_web::test]
-async fn test_get_user_new_user() {
-    let app = test::init_service(
-        App::new()
-        .route("/users/{id}", web::get().to(get_user))
-        ).await;
-
-    let private_key = common::set_up_test_key();
-    let token = common::get_test_token(private_key, None);
-    
-
+    // Send request
     let req = test::TestRequest::get()
-        .uri(format!("/users/{}", common::NEW_TEST_UUID).as_str())
+        .uri(format!("/users/{}", user_uuid).as_str())
         .insert_header((reqwest::header::AUTHORIZATION, format!("Bearer {}", token)))
-        .to_request();
-
+        .to_request();    
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), reqwest::StatusCode::CREATED); 
-
-    common::remove_user(None).await;
-    common::clean_up_test_key(); 
+    mock.assert_async().await;
+    assert_eq!(resp.status(), StatusCode::CREATED);
 }
-
-
 #[actix_web::test]
-async fn test_get_user_existing_user() {
+async fn test_get_user_same_user_existing_sucess() {
+    // Create token
+    let mut server = Server::new_async().await;
+    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let now = chrono::Utc::now().timestamp() as u64; 
+    let user_uuid = common::insert_users(1).await.into_iter().next().unwrap();
+    let claims = AccessTokenClaims {
+        sub: user_uuid,
+        nickname: "test".to_owned(),
+        email_verified: true,
+        iss: "test".to_owned(),
+        aud: "test".to_owned(),
+        exp: now + 100,
+        iat: now - 100,
+        token_use: "id".to_owned(),
+    };
+    let header = jwt::Header {
+        alg: jwt::Algorithm::RS256,
+        kid: Some(kid),
+        ..Default::default()
+    };
+    let token = jwt::encode(
+        &header,
+        &claims,
+        &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+
+    // Create test server
     let app = test::init_service(
         App::new()
         .route("/users/{id}", web::get().to(get_user))
         ).await;
 
-    let private_key = common::set_up_test_key();
-    let existing_user = common::insert_user().await;
-    let user_id = existing_user.id.clone();
-    let token = common::get_test_token(private_key, Some(existing_user));
-    
-
+    // Send request
     let req = test::TestRequest::get()
-        .uri(format!("/users/{}", user_id).as_str())
+        .uri(format!("/users/{}", user_uuid).as_str())
         .insert_header((reqwest::header::AUTHORIZATION, format!("Bearer {}", token)))
-        .to_request();
-
+        .to_request();    
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), reqwest::StatusCode::OK); 
-
-    common::remove_user(Some(user_id)).await;
-    common::clean_up_test_key(); 
+    mock.assert_async().await;
+    assert_eq!(resp.status(), StatusCode::OK);
 }
+#[actix_web::test]
+async fn test_get_user_different_user_existing_sucess() {
+    // Create token
+    let mut server = Server::new_async().await;
+    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let now = chrono::Utc::now().timestamp() as u64; 
+    let user_uuid = common::insert_users(1).await.into_iter().next().unwrap();
+    let claims = AccessTokenClaims {
+        sub: uuid::Uuid::new_v4(),
+        nickname: "test".to_owned(),
+        email_verified: true,
+        iss: "test".to_owned(),
+        aud: "test".to_owned(),
+        exp: now + 100,
+        iat: now - 100,
+        token_use: "id".to_owned(),
+    };
+    let header = jwt::Header {
+        alg: jwt::Algorithm::RS256,
+        kid: Some(kid),
+        ..Default::default()
+    };
+    let token = jwt::encode(
+        &header,
+        &claims,
+        &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+
+    // Create test server
+    let app = test::init_service(
+        App::new()
+        .route("/users/{id}", web::get().to(get_user))
+        ).await;
+
+    // Send request
+    let req = test::TestRequest::get()
+        .uri(format!("/users/{}", user_uuid).as_str())
+        .insert_header((reqwest::header::AUTHORIZATION, format!("Bearer {}", token)))
+        .to_request();    
+    let resp = test::call_service(&app, req).await;
+    mock.assert_async().await;
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+
+
+#[actix_web::test]
+async fn test_get_user_invalid_header() {
+    // Create token
+    let mut server = Server::new_async().await;
+    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let now = chrono::Utc::now().timestamp() as u64; 
+    let user_uuid = uuid::Uuid::new_v4();
+    let claims = AccessTokenClaims {
+        sub: user_uuid,
+        nickname: "test".to_owned(),
+        email_verified: true,
+        iss: "test".to_owned(),
+        aud: "test".to_owned(),
+        exp: now + 100,
+        iat: now - 100,
+        token_use: "id".to_owned(),
+    };
+    let header = jwt::Header {
+        alg: jwt::Algorithm::RS256,
+        kid: Some(kid),
+        ..Default::default()
+    };
+    let token = jwt::encode(
+        &header,
+        &claims,
+        &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+
+    // Create test server
+    let app = test::init_service(
+        App::new()
+        .route("/users/{id}", web::get().to(get_user))
+        ).await;
+
+    // Send request
+    let req = test::TestRequest::get()
+        .uri(format!("/users/{}", user_uuid).as_str())
+        .insert_header((reqwest::header::AUTHORIZATION, format!("WRONG {}", token)))
+        .to_request();    
+    let resp = test::call_service(&app, req).await;
+    mock.remove_async().await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+#[actix_web::test]
+async fn test_get_user_invalid_validation() {
+    // Create token
+    let mut server = Server::new_async().await;
+    let (_private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let (other_private_key, _, _, _, _) = common::generate_key();
+    let now = chrono::Utc::now().timestamp() as u64; 
+    let user_uuid = common::insert_users(1).await.into_iter().next().unwrap();
+    let claims = AccessTokenClaims {
+        sub: uuid::Uuid::new_v4(),
+        nickname: "test".to_owned(),
+        email_verified: true,
+        iss: "test".to_owned(),
+        aud: "test".to_owned(),
+        exp: now + 100,
+        iat: now - 100,
+        token_use: "id".to_owned(),
+    };
+    let header = jwt::Header {
+        alg: jwt::Algorithm::RS256,
+        kid: Some(kid),
+        ..Default::default()
+    };
+    let token = jwt::encode(
+        &header,
+        &claims,
+        &jwt::EncodingKey::from_rsa_pem(&other_private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+
+    // Create test server
+    let app = test::init_service(
+        App::new()
+        .route("/users/{id}", web::get().to(get_user))
+        ).await;
+
+    // Send request
+    let req = test::TestRequest::get()
+        .uri(format!("/users/{}", user_uuid).as_str())
+        .insert_header((reqwest::header::AUTHORIZATION, format!("Bearer {}", token)))
+        .to_request();    
+    let resp = test::call_service(&app, req).await;
+    mock.assert_async().await;
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+#[actix_web::test]
+async fn test_get_user_error_getting_jwks() {
+    // Create token
+    let mut server = Server::new_async().await;
+    let (private_key, _kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let now = chrono::Utc::now().timestamp() as u64; 
+    let user_uuid = uuid::Uuid::new_v4();
+    let claims = AccessTokenClaims {
+        sub: user_uuid,
+        nickname: "test".to_owned(),
+        email_verified: true,
+        iss: "test".to_owned(),
+        aud: "test".to_owned(),
+        exp: now + 100,
+        iat: now - 100,
+        token_use: "id".to_owned(),
+    };
+    let header = jwt::Header {
+        alg: jwt::Algorithm::RS256,
+        kid: None,
+        ..Default::default()
+    };
+    let token = jwt::encode(
+        &header,
+        &claims,
+        &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+
+    // Create test server
+    let app = test::init_service(
+        App::new()
+        .route("/users/{id}", web::get().to(get_user))
+        ).await;
+
+    // Send request
+    let req = test::TestRequest::get()
+        .uri(format!("/users/{}", user_uuid).as_str())
+        .insert_header((reqwest::header::AUTHORIZATION, format!("Bearer {}", token)))
+        .to_request();    
+    let resp = test::call_service(&app, req).await;
+    mock.remove_async().await;
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+
+
+#[actix_web::test]
+async fn test_get_user_invalid_url_uuid() {
+    // Create token
+    let mut server = Server::new_async().await;
+    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let now = chrono::Utc::now().timestamp() as u64; 
+    let user_uuid = uuid::Uuid::new_v4();
+    let claims = AccessTokenClaims {
+        sub: user_uuid,
+        nickname: "test".to_owned(),
+        email_verified: true,
+        iss: "test".to_owned(),
+        aud: "test".to_owned(),
+        exp: now + 100,
+        iat: now - 100,
+        token_use: "id".to_owned(),
+    };
+    let header = jwt::Header {
+        alg: jwt::Algorithm::RS256,
+        kid: Some(kid),
+        ..Default::default()
+    };
+    let token = jwt::encode(
+        &header,
+        &claims,
+        &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+
+    // Create test server
+    let app = test::init_service(
+        App::new()
+        .route("/users/{id}", web::get().to(get_user))
+        ).await;
+
+    // Send request
+    let req = test::TestRequest::get()
+        .uri("/users/WRONG_UUID")
+        .insert_header((reqwest::header::AUTHORIZATION, format!("Bearer {}", token)))
+        .to_request();    
+    let resp = test::call_service(&app, req).await;
+    mock.assert_async().await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[actix_web::test]
+async fn test_get_user_different_user_doesnt_exist() {
+    // Create token
+    let mut server = Server::new_async().await;
+    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let now = chrono::Utc::now().timestamp() as u64; 
+    let claims = AccessTokenClaims {
+        sub: uuid::Uuid::new_v4(),
+        nickname: "test".to_owned(),
+        email_verified: true,
+        iss: "test".to_owned(),
+        aud: "test".to_owned(),
+        exp: now + 100,
+        iat: now - 100,
+        token_use: "id".to_owned(),
+    };
+    let header = jwt::Header {
+        alg: jwt::Algorithm::RS256,
+        kid: Some(kid),
+        ..Default::default()
+    };
+    let token = jwt::encode(
+        &header,
+        &claims,
+        &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+
+    // Create test server
+    let app = test::init_service(
+        App::new()
+        .route("/users/{id}", web::get().to(get_user))
+        ).await;
+
+    // Send request
+    let req = test::TestRequest::get()
+        .uri(format!("/users/{}", uuid::Uuid::new_v4()).as_str())
+        .insert_header((reqwest::header::AUTHORIZATION, format!("Bearer {}", token)))
+        .to_request();    
+    let resp = test::call_service(&app, req).await;
+    mock.assert_async().await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+/*
+#[actix_web::test]
+async fn test_get_user_error_selecting() {
+}
+
+#[actix_web::test]
+async fn test_get_user_error_inserting() {
+}
+*/

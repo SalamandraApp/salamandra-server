@@ -1,176 +1,754 @@
 use actix_web::HttpRequest;
-use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+use jsonwebtoken as jwt;
+use jsonwebkey::JsonWebKey;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use reqwest;
 
-fn process_jwt(token: &str) -> Result<AccessTokenClaims, String> {
+/// Call AWS to get JWK set
+async fn fetch_jwks(jwks_url: String) -> Result<JWKSet, String> {
+    // TODO: store the jwks
+    println!("CALLING: {}", jwks_url);
+    let response = reqwest::get(&jwks_url).await
+        .map_err(|err| err.to_string())?;
+
+    if !response.status().is_success() {
+        return Err(format!("Wrong HTTP code, 200 != {}", response.status()));
+    }
+    let jwk_set = response.json::<JWKSet>().await
+        .map_err(|err| err.to_string())?;
+
+    Ok(jwk_set)
+}
+
+async fn get_key(token: &str) -> Result<String, String>{
+     // Decode header to get kid
+    let header = jsonwebtoken::decode_header(token)
+        .map_err(|e| e.to_string())?;
+    let kid = header.kid.ok_or_else(|| "Error: Kid is None".to_string())?;
+
+    // Fetch JWKs
+    let url = std::env::var("JWKS_URL").map_err(|e| e.to_string())?;
+    let jwk_set: JWKSet = fetch_jwks(url).await?;
     
-    let key_file_path = std::env::var("PUBLIC_KEY_FILE").unwrap_or_else(|_| "keys/jwt_key.pem".into());    
-    let public_key = match std::fs::read_to_string(key_file_path) {
-        Ok(key) => key,
-        Err(_) => return Err("Failed to read key file".to_string()),
-    };
+    // Find matching JWK
+    let jwk = jwk_set.keys.iter().find(|k| k.key_id == Some(kid.clone()))
+        .ok_or("Matching 'kid' not found in JWK set")?;
+    Ok(jwk.key.to_pem())
+}
 
-    let validation = Validation::new(Algorithm::RS256);
+fn process_jwt(token: &str, pem: &str) -> Result<AccessTokenClaims, String> {
+    
+    let validation = jwt::Validation::new(jwt::Algorithm::RS256);
 
-    decode::<AccessTokenClaims>(
+    // Verify Signature
+    let token_data = jwt::decode::<AccessTokenClaims>(
         token,
-        &DecodingKey::from_rsa_pem(public_key.as_bytes()).map_err(|err| err.to_string())?,
+        &jwt::DecodingKey::from_rsa_pem(pem.as_bytes()).map_err(|err| err.to_string())?,
         &validation,
-    )
-    .map(|data| data.claims)
-    .map_err(|err| err.to_string())
+        ).map_err(|err| err.to_string())?;
+    let claims = token_data.claims;
+
+    // exp
+    let current_timestamp = chrono::Utc::now().timestamp() as u64;
+    let leeway = 30; 
+    if claims.exp < current_timestamp - leeway {
+        return Err("Token has expired".to_string());
+    }
+
+    // iat
+    if claims.iat > current_timestamp + leeway {
+        return Err("Token issued in the future".to_string());
+    }
+
+    // iss
+    let issuer = std::env::var("COGNITO_ENDPOINT").map_err(|e| e.to_string())?;
+    if claims.iss != issuer {
+        return Err("Invalid issuer".to_string());
+    }
+
+    // use
+    if claims.token_use != "id" {
+        return Err("Invalid token use".to_string());
+    }
+
+    if !claims.email_verified {
+        return Err("Email is not verified".to_string());
+    }
+    Ok(claims)
+
 }
 
 /// Receives the request to validate the claims
-/// * The file path is only for testing
-pub fn handle_protected(req: HttpRequest) -> Result<AccessTokenClaims, ProtectedCallError> {
+/// * The file path is only for tokio::testing
+pub async fn handle_protected_call(req: HttpRequest) -> Result<AccessTokenClaims, ProtectedCallError> {
 
     // Unwrap the header fields
-    let auth_header = match req.headers().get("Authorization")
+    let token = match req.headers().get("Authorization")
         .and_then(|hv| hv.to_str().ok())
         .and_then(|s| s.strip_prefix("Bearer ")) {
             Some(header) => header,
             None => return Err(ProtectedCallError::WrongHeader),
         };
+    // Get key
+    let pem = get_key(token).await
+        .map_err(|e| ProtectedCallError::ErrorGettingKey(e.to_string()))?;
     // Validate token
-    process_jwt(auth_header)
-        .map_err(|error| ProtectedCallError::JwtError(error.to_string()))
+    process_jwt(token, &pem)
+        .map_err(|e| ProtectedCallError::JwtError(e.to_string()))
     
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct AccessTokenClaims {
-    pub exp: i64,
+    pub sub: uuid::Uuid,
+    // TODO: 
+    pub nickname: String,
+    pub email_verified: bool,
     pub iss: String,
-    pub sub: Uuid,
-    #[serde(rename = "preferred_username")]
-    pub preferred_username: String,
-    /*
-    iat: i64,
-    jti: String,
-    aud: String,
-    typ: String,
-    azp: String,
-    session_state: String,
-    acr: String,
-    #[serde(rename = "allowed-origins")]
-    allowed_origins: Vec<String>,
-    realm_access: RealmAccess,
-    resource_access: ResourceAccess,
-    scope: String,
-    sid: String,
-    email_verified: bool,
-    email: String,
-    */
+    pub aud: String,
+    pub exp: u64,
+    pub iat: u64,
+    pub token_use: String,
+    // #[serde(rename = "cognito:username")]
+    // cognito_username: String,
+    // origin_jti: String,
+    // event_id: String,
+    // auth_time: u64,
+    // email: String,
+    // jti: String,
 }
+
+#[derive(Debug, Deserialize)]
+struct JWKSet {
+    keys: Vec<JsonWebKey>,
+}
+
 
 pub enum ProtectedCallError {
     WrongHeader,
     JwtError(String),
+    ErrorGettingKey(String),
 }
+
 
 
 
 #[cfg(test)]
 mod tests {
-    use super::*; // Import symbols from the outer module
-    const TEST_KEY_PATH: &str = "test_jwt_key.pem";
-    const TEST_UUID: &str = "123e4567-e89b-12d3-a456-426614174000";
+    use super::*;
+    use actix_web::{test::TestRequest, http::header};
+    use crate::utils::test::{create_mock, generate_key};
 
-    #[test]
-    fn test_process_jwt_success_case() {
-        dotenv::dotenv().ok();
-        // Generate and set up test keys
-        let rsa = openssl::rsa::Rsa::generate(4096).expect("Failed to generate RSA key pair");
-        let private_key_pem = rsa.private_key_to_pem().expect("Failed to convert to pem");
-        let public_key_pem = rsa.public_key_to_pem().expect("Failed to convert to pem");
-        std::fs::write(TEST_KEY_PATH, &public_key_pem).expect("Failed to create key_file");
-        std::env::set_var("PUBLIC_KEY_FILE", TEST_KEY_PATH);
-
-        // Create good claims
-        let claims = AccessTokenClaims {
-            sub: uuid::Uuid::parse_str(TEST_UUID).expect("Failed to created uuid"),
-            iss: "http://localhost:8080".to_owned(),
-            exp: 10000000000,
-            preferred_username: "test username".to_owned()
-        };
-        
-        // Encode the claims in a token
-        let token = jsonwebtoken::encode(
-            &jsonwebtoken::Header::new(Algorithm::RS256),
-            &claims,
-            &jsonwebtoken::EncodingKey::from_rsa_pem(&private_key_pem).expect("Failed to encode jwt"),
-            ).expect("Failed to create jwt");
-
-        let result = process_jwt(&token);
-        assert!(result.is_ok());
-
-        std::fs::remove_file(TEST_KEY_PATH).expect("Failed to delete key_file");
-        std::env::remove_var("PUBLIC_KEY_FILE");
+    // Fetch JWK
+    #[tokio::test]
+    async fn test_fetch_jwks_success() {
+        let mut server = mockito::Server::new_async().await;
+        let (mock, url) = create_mock(&mut server, 200, r#"{"keys": []}"#,).await;
+        let res = fetch_jwks(url).await;
+        assert!(res.is_ok());
+        mock.assert_async().await;
+    }    
+    #[tokio::test]
+    async fn test_fetch_jwks_wrong_header(){
+        let mut server = mockito::Server::new_async().await;
+        let (mock, url) = create_mock(&mut server, 404, r#"{"keys": []}"#,).await;
+        let res = fetch_jwks(url).await;
+        assert!(res.is_err());
+        mock.assert_async().await;
+    } 
+    #[tokio::test]
+    async fn test_fetch_jwks_wrong_response_content_1(){
+        let mut server = mockito::Server::new_async().await;
+        let (mock, url) = create_mock(&mut server, 202, r#"{"WRONG": []}"#,).await;
+        let res = fetch_jwks(url).await;
+        assert!(res.is_err());
+        mock.assert_async().await;
+    } 
+    #[tokio::test]
+    async fn test_fetch_jwks_wrong_response_content_2(){
+        let mut server = mockito::Server::new_async().await;
+        let (mock, url) = create_mock(
+            &mut server, 
+            202, 
+            r#"{
+                "keys": [{
+                    "WRONG KEY": "RS256",
+                    "e": "AQAB",
+                    "kid": "cool_key_id=",
+                    "kty": "RSA",
+                    "n": "cool_big_number",
+                    "use": "sig"
+                }]}"#,).await;
+        let res = fetch_jwks(url).await;
+        assert!(res.is_err());
+        mock.assert_async().await;   
     }
 
-    #[test]
-    fn test_process_jwt_wrong_key() {
 
-        // Same as previous test, but the decoding key is wrong
-        let rsa = openssl::rsa::Rsa::generate(4096).expect("Failed to generate RSA key pair");
-        let private_key_pem = rsa.private_key_to_pem().expect("Failed to convert to pem");
+    // Get key
+    #[tokio::test]
+    async fn test_get_key_success(){
+        // Set up key
+        let (private_key, public_key, e, n, kid) = generate_key();
+        let (_private_key, _public_key, other_e, other_n, other_kid) = generate_key();
+        let body = format!(
+            r#"{{"keys": [
+                    {{
+                        "e": "{}",
+                        "n": "{}",
+                        "kid": "{}",
+                        "alg": "RS256",
+                        "kty": "RSA",
+                        "use": "sig"
+                    }},
+                    {{
+                        "e": "{}",
+                        "n": "{}",
+                        "kid": "{}",
+                        "alg": "RS256",
+                        "kty": "RSA",
+                        "use": "sig"
+                    }}
+
+            ]}}"#,
+            e, n, kid, other_e, other_n, other_kid
+            );
+
+        // Set up test server
+        let mut server = mockito::Server::new_async().await;
+        let (mock, url) = create_mock(&mut server, 200, &body).await;
+        std::env::set_var("JWKS_URL", url);
 
         let claims = AccessTokenClaims {
-            sub: uuid::Uuid::parse_str(TEST_UUID).expect("Failed to created uuid"),
-            iss: "http://localhost:8080".to_owned(),
-            exp: 10000000000,
-            preferred_username: "test username".to_owned()
-
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test".to_owned(),
+            aud: "test".to_owned(),
+            exp: 0,
+            iat: 0,
+            token_use: "test".to_owned(),
         };
-        let token = jsonwebtoken::encode(
-            &jsonwebtoken::Header::new(Algorithm::RS256),
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
             &claims,
-            &jsonwebtoken::EncodingKey::from_rsa_pem(&private_key_pem).expect("Failed to encode jwt"),
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        
+        let res = get_key(&token).await;
+        assert!(res.is_ok());
+        let res_key = res.unwrap();
+        assert_eq!(res_key, public_key);
+        mock.assert_async().await;    
+    }
+    #[tokio::test]
+    async fn test_get_key_no_kid(){
+        let (private_key, _public_key, _e, _n, _kid) = generate_key();
+
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test".to_owned(),
+            aud: "test".to_owned(),
+            exp: 0,
+            iat: 0,
+            token_use: "test".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: None,
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        
+        let res = get_key(&token).await;
+        assert!(res.is_err());
+        let err = res.expect_err("Expected an error");
+        assert_eq!(err.to_string(), "Error: Kid is None");
+    }
+    #[tokio::test]
+    async fn test_get_key_no_matching_kid(){
+        // Set up key
+        let (private_key, _public_key, e, n, kid) = generate_key();
+        let (_private_key, _public_key, _other_e, _other_n, other_kid) = generate_key();
+        let body = format!(
+            r#"{{"keys": [
+                    {{
+                        "e": "{}",
+                        "n": "{}",
+                        "kid": "{}",
+                        "alg": "RS256",
+                        "kty": "RSA",
+                        "use": "sig"
+                    }}
+            ]}}"#,
+            e, n, kid
+            );
+
+        // Set up test server
+        let mut server = mockito::Server::new_async().await;
+        let (mock, url) = create_mock(&mut server, 200, &body).await;
+        std::env::set_var("JWKS_URL", url);
+
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test".to_owned(),
+            aud: "test".to_owned(),
+            exp: 0,
+            iat: 0,
+            token_use: "test".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(other_kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        
+        let res = get_key(&token).await;
+        assert!(res.is_err());
+        let err = res.expect_err("Expected an error");
+        assert_eq!(err.to_string(), "Matching 'kid' not found in JWK set");
+        mock.assert_async().await;    
+    }
+    #[tokio::test]
+    async fn test_get_key_url_not_set(){
+        let (private_key, _public_key, _e, _n, kid) = generate_key();
+        std::env::remove_var("JWKS_URL");
+
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test".to_owned(),
+            aud: "test".to_owned(),
+            exp: 0,
+            iat: 0,
+            token_use: "test".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        
+        let res = get_key(&token).await;
+        assert!(res.is_err());
+        let err = res.expect_err("Expected an error");
+        assert_eq!(err.to_string(), "environment variable not found");
+    }
+
+
+    // Process jwt
+    #[tokio::test]
+    async fn test_process_jwt_sucess(){
+        // Set up key
+        let (private_key, public_key, _e, _n, kid) = generate_key();
+        let now = chrono::Utc::now().timestamp() as u64; 
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test issuer".to_owned(),
+            aud: "test".to_owned(),
+            exp: now + 100,
+            iat: now - 100,
+            token_use: "id".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        std::env::set_var("COGNITO_ENDPOINT", "test issuer"); 
+        let res = process_jwt(&token, &public_key);
+        assert!(res.is_ok());
+        let res_claims = res.unwrap();
+        assert_eq!(res_claims, claims);
+    }
+    #[tokio::test]
+    async fn test_process_jwt_invalid_signature(){
+        // Set up key
+        let (private_key, _public_key, _e, _n, kid) = generate_key();
+        let (_private_key, other_public_key, _other_e, _other_n, _other_kid) = generate_key();
+        let now = chrono::Utc::now().timestamp() as u64; 
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test issuer".to_owned(),
+            aud: "test".to_owned(),
+            exp: now + 100,
+            iat: now - 100,
+            token_use: "id".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        std::env::set_var("COGNITO_ENDPOINT", "test issuer"); 
+        let res = process_jwt(&token, &other_public_key);
+        assert!(res.is_err());
+        let err = res.expect_err("Expected an error");
+        assert_eq!(err.to_string(), "InvalidSignature");
+    }
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+struct WrongClaims {
+    pub sub: uuid::Uuid,
+}
+    #[tokio::test]
+    async fn test_process_jwt_invalid_claim_format(){
+        // Set up key
+        let (private_key, public_key, _e, _n, kid) = generate_key();
+        let claims = WrongClaims {
+            sub: uuid::Uuid::new_v4(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        std::env::set_var("COGNITO_ENDPOINT", "test issuer"); 
+        let res = process_jwt(&token, &public_key);
+        assert!(res.is_err());
+        let err = res.expect_err("Expected an error");
+        let err_start = &err[0..10]; 
+        assert_eq!(err_start, "JSON error");
+    }
+    #[tokio::test]
+    async fn test_process_jwt_invalid_timestamps(){
+        // Set up key
+        let (private_key, public_key, _e, _n, kid) = generate_key();
+        let now = chrono::Utc::now().timestamp() as u64; 
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test issuer".to_owned(),
+            aud: "test".to_owned(),
+            exp: now + 100,
+            iat: now + 100,
+            token_use: "id".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        std::env::set_var("COGNITO_ENDPOINT", "test issuer"); 
+        let res = process_jwt(&token, &public_key);
+        assert!(res.is_err());
+        let err = res.expect_err("Expected an error");
+        assert_eq!(err, "Token issued in the future");
+    }
+    #[tokio::test]
+    async fn test_process_jwt_invalid_issuer(){
+        // Set up key
+        let (private_key, public_key, _e, _n, kid) = generate_key();
+        let now = chrono::Utc::now().timestamp() as u64; 
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test issuer".to_owned(),
+            aud: "test".to_owned(),
+            exp: now + 100,
+            iat: now - 100,
+            token_use: "id".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        std::env::set_var("COGNITO_ENDPOINT", "another issues"); 
+        let res = process_jwt(&token, &public_key);
+        assert!(res.is_err());
+        let err = res.expect_err("Expected an error");
+        assert_eq!(err, "Invalid issuer");
+    }
+    #[tokio::test]
+    async fn test_process_jwt_invalid_use(){
+        // Set up key
+        let (private_key, public_key, _e, _n, kid) = generate_key();
+        let now = chrono::Utc::now().timestamp() as u64; 
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test issuer".to_owned(),
+            aud: "test".to_owned(),
+            exp: now + 100,
+            iat: now - 100,
+            token_use: "NOT id".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        std::env::set_var("COGNITO_ENDPOINT", "test issuer"); 
+        let res = process_jwt(&token, &public_key);
+        assert!(res.is_err());
+        let err = res.expect_err("Expected an error");
+        assert_eq!(err, "Invalid token use");
+    }
+    #[tokio::test]
+    async fn test_process_jwt_unverified_email(){
+        // Set up key
+        let (private_key, public_key, _e, _n, kid) = generate_key();
+        let now = chrono::Utc::now().timestamp() as u64; 
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: false,
+            iss: "test issuer".to_owned(),
+            aud: "test".to_owned(),
+            exp: now + 100,
+            iat: now - 100,
+            token_use: "id".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+        std::env::set_var("COGNITO_ENDPOINT", "test issuer"); 
+        let res = process_jwt(&token, &public_key);
+        assert!(res.is_err());
+        let err = res.expect_err("Expected an error");
+        assert_eq!(err, "Email is not verified");
+    }
+
+
+    // Handler protected
+    #[tokio::test]
+    async fn test_handle_protected_call_success(){
+        // Set up key
+        let (private_key, _public_key, e, n, kid) = generate_key();
+        let (_private_key, _public_key, other_e, other_n, other_kid) = generate_key();
+        let body = format!(
+            r#"{{"keys": [
+                    {{
+                        "e": "{}",
+                        "n": "{}",
+                        "kid": "{}",
+                        "alg": "RS256",
+                        "kty": "RSA",
+                        "use": "sig"
+                    }},
+                    {{
+                        "e": "{}",
+                        "n": "{}",
+                        "kid": "{}",
+                        "alg": "RS256",
+                        "kty": "RSA",
+                        "use": "sig"
+                    }}
+            ]}}"#,
+            e, n, kid, other_e, other_n, other_kid
+            );
+
+        // Set up test server
+        let mut server = mockito::Server::new_async().await;
+        let (_mock, url) = create_mock(&mut server, 200, &body).await;
+        std::env::set_var("JWKS_URL", url);
+        let now = chrono::Utc::now().timestamp() as u64; 
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test".to_owned(),
+            aud: "test".to_owned(),
+            exp: now + 100,
+            iat: now - 100,
+            token_use: "id".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &claims,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
         ).expect("Failed to create jwt");
 
-        let result = process_jwt(&token);
-        assert!(!result.is_ok());
+        // GET request, uri doesnt matter, with token as authorization
+        let req = TestRequest::default()
+            .insert_header((header::AUTHORIZATION, format!("Bearer {}", token)))
+            .to_http_request();
 
+        match handle_protected_call(req).await {
+            Ok(res_claims) => assert_eq!(res_claims, claims),
+            Err(_) => (), 
+        }
     }
-
-    #[test]
-    fn test_process_jwt_wrong_json_format() {
-        let rsa = openssl::rsa::Rsa::generate(4096).expect("Failed to generate RSA key pair");
-        let private_key_pem = rsa.private_key_to_pem().expect("Failed to convert to pem");
-        let public_key_pem = rsa.public_key_to_pem().expect("Failed to convert to pem");
-        std::fs::write(TEST_KEY_PATH, &public_key_pem).expect("Failed to create key_file");
-        std::env::set_var("PUBLIC_KEY_FILE", TEST_KEY_PATH);
-
-        let claims = WrongClaims {
-            // sub: uuid::Uuid::parse_str(TEST_UUID).expect("Failed to created uuid"),
-            iss: "http://localhost:8080".to_owned(),
-            exp: 10000000000,
-            preferred_username: "test username".to_owned()
-
+    #[tokio::test]
+    async fn test_handle_protected_call_wrong_header(){
+        // Set up key
+        let (private_key, _public_key, _e, _n, kid) = generate_key();
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
         };
-        let token = jsonwebtoken::encode(
-            &jsonwebtoken::Header::new(Algorithm::RS256),
+        let token = jwt::encode(
+            &header,
+            &None::<String>,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+
+        // GET request, uri doesnt matter, with token as authorization
+        let req = TestRequest::default()
+            .insert_header((header::TE, format!("Bearer {}", token)))
+            .to_http_request();
+
+        let res = handle_protected_call(req).await;
+        assert!(matches!(res, Err(ProtectedCallError::WrongHeader)));
+    }
+    #[tokio::test]
+    async fn test_handle_protected_call_error_getting_key(){
+        // Set up key
+        let (private_key, _public_key, _e, _n, _kid) = generate_key();
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: None,
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
+            &None::<String>,
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
+
+        // GET request, uri doesnt matter, with token as authorization
+        let req = TestRequest::default()
+            .insert_header((header::AUTHORIZATION, format!("Bearer {}", token)))
+            .to_http_request();
+
+        // No Kid error
+        let res = handle_protected_call(req).await;
+        assert!(matches!(res, Err(ProtectedCallError::ErrorGettingKey(_))));
+    }
+    #[tokio::test]
+    async fn test_handle_protected_call_error_jwt(){
+        // Set up key
+        let (private_key, _public_key, e, n, kid) = generate_key();
+        let (_private_key, _public_key, other_e, other_n, other_kid) = generate_key();
+        let body = format!(
+            r#"{{"keys": [
+                    {{
+                        "e": "{}",
+                        "n": "{}",
+                        "kid": "{}",
+                        "alg": "RS256",
+                        "kty": "RSA",
+                        "use": "sig"
+                    }},
+                    {{
+                        "e": "{}",
+                        "n": "{}",
+                        "kid": "{}",
+                        "alg": "RS256",
+                        "kty": "RSA",
+                        "use": "sig"
+                    }}
+            ]}}"#,
+            e, n, kid, other_e, other_n, other_kid
+            );
+
+        // Set up test server
+        let mut server = mockito::Server::new_async().await;
+        let (_mock, url) = create_mock(&mut server, 200, &body).await;
+        std::env::set_var("JWKS_URL", url);
+        let now = chrono::Utc::now().timestamp() as u64; 
+        let claims = AccessTokenClaims {
+            sub: uuid::Uuid::new_v4(),
+            nickname: "test".to_owned(),
+            email_verified: true,
+            iss: "test".to_owned(),
+            aud: "test".to_owned(),
+            exp: now + 100,
+            iat: now + 200,
+            token_use: "test".to_owned(),
+        };
+        let header = jwt::Header {
+            alg: jwt::Algorithm::RS256,
+            kid: Some(kid),
+            ..Default::default()
+        };
+        let token = jwt::encode(
+            &header,
             &claims,
-            &jsonwebtoken::EncodingKey::from_rsa_pem(&private_key_pem).expect("Failed to encode jwt"),
-            ).expect("Failed to create jwt");
+            &jwt::EncodingKey::from_rsa_pem(&private_key).expect("Failed to encode jwt"),
+        ).expect("Failed to create jwt");
 
-        let result = process_jwt(&token);
-        assert!(!result.is_ok());
+        // GET request, uri doesnt matter, with token as authorization
+        let req = TestRequest::default()
+            .insert_header((header::AUTHORIZATION, format!("Bearer {}", token)))
+            .to_http_request();
 
-        std::fs::remove_file(TEST_KEY_PATH).expect("Failed to delete key_file");
-        std::env::remove_var("PUBLIC_KEY_FILE");
+        // Issued in the future
+        let res = handle_protected_call(req).await;
+        assert!(matches!(res, Err(ProtectedCallError::JwtError(_))));
     }
 }
-
-
-#[derive(Deserialize, Serialize)]
-pub struct WrongClaims {
-    pub exp: i64,
-    pub iss: String,
-    // pub sub: Uuid,
-    #[serde(rename = "preferred_username")]
-    pub preferred_username: String,
-}
-

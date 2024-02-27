@@ -1,4 +1,5 @@
 /target
 /keys
+.env.tmp
 .env
 /log
