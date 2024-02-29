@@ -9,22 +9,14 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    env:
-      TEST_DATABASE_URL: postgres://user:password@localhost:5432/testdb
     services:
-      postgres:
-        image: postgres:latest
-        env:
-          POSTGRES_USER: user
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: testdb
+      docker:
+        image: docker:19.03.12
+        options: --privileged
         ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          - 2375:2375
+    env:
+      DOCKER_HOST: tcp://localhost:2375
 
     steps:
     - uses: actions/checkout@v2
@@ -42,9 +34,11 @@ jobs:
     - name: Install Diesel CLI
       run: cargo install diesel_cli --no-default-features --features postgres
 
-    - name: Run Diesel Migrations
-      run: diesel migration run --database-url=postgres://user:password@localhost:5432/testdb
+    - name: Set up Docker
+      uses: docker/setup-docker@v1
+      with:
+        version: '19.03'
 
-    # To avoid race conditions, will fix the tests later
     - name: Build and test
-      run: RUST_BACKTRACE=1 cargo test -- --test-threads=1
+      run: RUST_BACKTRACE=1 cargo test
+

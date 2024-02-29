@@ -1,30 +1,52 @@
 //! Testing handlers/users/ get_user
-//!
+//!get
 //! I don't know if it will stay here, but its good for now
 //!
 //! Test Naming
 //! test_<function>_<case>
-
 use actix_web::{web, App, test};
 use reqwest::StatusCode;
 use jsonwebtoken as jwt;
 use mockito::Server;
+use testcontainers::clients::Cli;
 
 use salamandra_server::handlers::users::get_user;
+use salamandra_server::db::establish_connection;
+use salamandra_server::Config;
 use salamandra_server::utils::{test as common, auth::AccessTokenClaims};
+
 
 #[actix_web::test]
 async fn test_get_user_same_user_new_sucess() {
-    // Create token
+    
+    // Set up docker
+    let docker = Cli::default();
+    let image = common::container_setup();
+    let instance = docker.run(image.image);
+    let db_url = format!(
+        "postgres://{}:password@127.0.0.1:{}/{}",
+        image.user,
+        instance.get_host_port_ipv4(5432),
+        image.db
+    );
+    let mut conn = establish_connection(db_url.clone()).unwrap();
+    common::run_migrations(&mut conn)
+        .expect("Failed to run migrations");
+    // Set up endpoint
     let mut server = Server::new_async().await;
-    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let (private_key, kid, mock, jwks_url) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    
+    // App config
+    let config = Config::new(db_url,"test_issuer".to_string(),jwks_url);
+
+    // Create token
     let now = chrono::Utc::now().timestamp() as u64; 
     let user_uuid = uuid::Uuid::new_v4();
     let claims = AccessTokenClaims {
         sub: user_uuid,
         nickname: "test".to_owned(),
         email_verified: true,
-        iss: "test".to_owned(),
+        iss: "test_issuer".to_owned(),
         aud: "test".to_owned(),
         exp: now + 100,
         iat: now - 100,
@@ -44,8 +66,9 @@ async fn test_get_user_same_user_new_sucess() {
     // Create test server
     let app = test::init_service(
         App::new()
+        .app_data(web::Data::new(config))
         .route("/users/{id}", web::get().to(get_user))
-        ).await;
+    ).await;
 
     // Send request
     let req = test::TestRequest::get()
@@ -53,21 +76,39 @@ async fn test_get_user_same_user_new_sucess() {
         .insert_header((reqwest::header::AUTHORIZATION, format!("Bearer {}", token)))
         .to_request();    
     let resp = test::call_service(&app, req).await;
-    mock.assert_async().await;
     assert_eq!(resp.status(), StatusCode::CREATED);
+    mock.assert_async().await;
 }
 #[actix_web::test]
 async fn test_get_user_same_user_existing_sucess() {
-    // Create token
+    // Set up docker
+    let docker = Cli::default();
+    let image = common::container_setup();
+    let instance = docker.run(image.image);
+    let db_url = format!(
+        "postgres://{}:password@127.0.0.1:{}/{}",
+        image.user,
+        instance.get_host_port_ipv4(5432),
+        image.db
+    );
+    let mut conn = establish_connection(db_url.clone()).unwrap();
+    common::run_migrations(&mut conn)
+        .expect("Failed to run migrations");
+    // Set up endpoint
     let mut server = Server::new_async().await;
-    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let (private_key, kid, mock, jwks_url) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    
+    // App config
+    let config = Config::new(db_url.clone(),"test_issuer".to_string(),jwks_url);
+
+    // Create token
     let now = chrono::Utc::now().timestamp() as u64; 
-    let user_uuid = common::insert_users(1).await.into_iter().next().unwrap();
+    let user_uuid = common::insert_users(1, db_url).await.into_iter().next().unwrap();
     let claims = AccessTokenClaims {
         sub: user_uuid,
         nickname: "test".to_owned(),
         email_verified: true,
-        iss: "test".to_owned(),
+        iss: "test_issuer".to_owned(),
         aud: "test".to_owned(),
         exp: now + 100,
         iat: now - 100,
@@ -87,8 +128,9 @@ async fn test_get_user_same_user_existing_sucess() {
     // Create test server
     let app = test::init_service(
         App::new()
+        .app_data(web::Data::new(config))
         .route("/users/{id}", web::get().to(get_user))
-        ).await;
+    ).await;
 
     // Send request
     let req = test::TestRequest::get()
@@ -101,16 +143,33 @@ async fn test_get_user_same_user_existing_sucess() {
 }
 #[actix_web::test]
 async fn test_get_user_different_user_existing_sucess() {
-    // Create token
+    // Set up docker
+    let docker = Cli::default();
+    let image = common::container_setup();
+    let instance = docker.run(image.image);
+    let db_url = format!(
+        "postgres://{}:password@127.0.0.1:{}/{}",
+        image.user,
+        instance.get_host_port_ipv4(5432),
+        image.db
+    );
+    let mut conn = establish_connection(db_url.clone()).unwrap();
+    common::run_migrations(&mut conn)
+        .expect("Failed to run migrations");
+    // Set up endpoint
     let mut server = Server::new_async().await;
-    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let (private_key, kid, mock, jwks_url) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    
+    // App config
+    let config = Config::new(db_url.clone(),"test_issuer".to_string(),jwks_url);
+
     let now = chrono::Utc::now().timestamp() as u64; 
-    let user_uuid = common::insert_users(1).await.into_iter().next().unwrap();
+    let user_uuid = common::insert_users(1, db_url).await.into_iter().next().unwrap();
     let claims = AccessTokenClaims {
         sub: uuid::Uuid::new_v4(),
         nickname: "test".to_owned(),
         email_verified: true,
-        iss: "test".to_owned(),
+        iss: "test_issuer".to_owned(),
         aud: "test".to_owned(),
         exp: now + 100,
         iat: now - 100,
@@ -130,6 +189,7 @@ async fn test_get_user_different_user_existing_sucess() {
     // Create test server
     let app = test::init_service(
         App::new()
+        .app_data(web::Data::new(config))
         .route("/users/{id}", web::get().to(get_user))
         ).await;
 
@@ -147,16 +207,32 @@ async fn test_get_user_different_user_existing_sucess() {
 
 #[actix_web::test]
 async fn test_get_user_invalid_header() {
-    // Create token
+    // Set up docker
+    let docker = Cli::default();
+    let image = common::container_setup();
+    let instance = docker.run(image.image);
+    let db_url = format!(
+        "postgres://{}:password@127.0.0.1:{}/{}",
+        image.user,
+        instance.get_host_port_ipv4(5432),
+        image.db
+    );
+    let mut conn = establish_connection(db_url.clone()).unwrap();
+    common::run_migrations(&mut conn)
+        .expect("Failed to run migrations");
+    // Set up endpoint
     let mut server = Server::new_async().await;
-    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let (private_key, kid, mock, jwks_url) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    
+    // App config
+    let config = Config::new(db_url.clone(),"test_issuer".to_string(),jwks_url);
     let now = chrono::Utc::now().timestamp() as u64; 
     let user_uuid = uuid::Uuid::new_v4();
     let claims = AccessTokenClaims {
         sub: user_uuid,
         nickname: "test".to_owned(),
         email_verified: true,
-        iss: "test".to_owned(),
+        iss: "test_issuer".to_owned(),
         aud: "test".to_owned(),
         exp: now + 100,
         iat: now - 100,
@@ -176,6 +252,7 @@ async fn test_get_user_invalid_header() {
     // Create test server
     let app = test::init_service(
         App::new()
+        .app_data(web::Data::new(config))
         .route("/users/{id}", web::get().to(get_user))
         ).await;
 
@@ -190,17 +267,34 @@ async fn test_get_user_invalid_header() {
 }
 #[actix_web::test]
 async fn test_get_user_invalid_validation() {
-    // Create token
+    // Set up docker
+    let docker = Cli::default();
+    let image = common::container_setup();
+    let instance = docker.run(image.image);
+    let db_url = format!(
+        "postgres://{}:password@127.0.0.1:{}/{}",
+        image.user,
+        instance.get_host_port_ipv4(5432),
+        image.db
+    );
+    let mut conn = establish_connection(db_url.clone()).unwrap();
+    common::run_migrations(&mut conn)
+        .expect("Failed to run migrations");
+    // Set up endpoint
     let mut server = Server::new_async().await;
-    let (_private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let (_private_key, kid, mock, jwks_url) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    
+    // App config
+    let config = Config::new(db_url.clone(),"test_issuer".to_string(),jwks_url);
+
     let (other_private_key, _, _, _, _) = common::generate_key();
     let now = chrono::Utc::now().timestamp() as u64; 
-    let user_uuid = common::insert_users(1).await.into_iter().next().unwrap();
+    let user_uuid = common::insert_users(1, db_url).await.into_iter().next().unwrap();
     let claims = AccessTokenClaims {
         sub: uuid::Uuid::new_v4(),
         nickname: "test".to_owned(),
         email_verified: true,
-        iss: "test".to_owned(),
+        iss: "test_issuer".to_owned(),
         aud: "test".to_owned(),
         exp: now + 100,
         iat: now - 100,
@@ -220,8 +314,9 @@ async fn test_get_user_invalid_validation() {
     // Create test server
     let app = test::init_service(
         App::new()
+        .app_data(web::Data::new(config))
         .route("/users/{id}", web::get().to(get_user))
-        ).await;
+    ).await;
 
     // Send request
     let req = test::TestRequest::get()
@@ -234,16 +329,32 @@ async fn test_get_user_invalid_validation() {
 }
 #[actix_web::test]
 async fn test_get_user_error_getting_jwks() {
-    // Create token
+    // Set up docker
+    let docker = Cli::default();
+    let image = common::container_setup();
+    let instance = docker.run(image.image);
+    let db_url = format!(
+        "postgres://{}:password@127.0.0.1:{}/{}",
+        image.user,
+        instance.get_host_port_ipv4(5432),
+        image.db
+    );
+    let mut conn = establish_connection(db_url.clone()).unwrap();
+    common::run_migrations(&mut conn)
+        .expect("Failed to run migrations");
+    // Set up endpoint
     let mut server = Server::new_async().await;
-    let (private_key, _kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let (private_key, _kid, mock, jwks_url) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    
+    // App config
+    let config = Config::new(db_url.clone(),"test_issuer".to_string(),jwks_url);
     let now = chrono::Utc::now().timestamp() as u64; 
     let user_uuid = uuid::Uuid::new_v4();
     let claims = AccessTokenClaims {
         sub: user_uuid,
         nickname: "test".to_owned(),
         email_verified: true,
-        iss: "test".to_owned(),
+        iss: "test_issuer".to_owned(),
         aud: "test".to_owned(),
         exp: now + 100,
         iat: now - 100,
@@ -263,6 +374,7 @@ async fn test_get_user_error_getting_jwks() {
     // Create test server
     let app = test::init_service(
         App::new()
+        .app_data(web::Data::new(config))
         .route("/users/{id}", web::get().to(get_user))
         ).await;
 
@@ -280,16 +392,32 @@ async fn test_get_user_error_getting_jwks() {
 
 #[actix_web::test]
 async fn test_get_user_invalid_url_uuid() {
-    // Create token
+    // Set up docker
+    let docker = Cli::default();
+    let image = common::container_setup();
+    let instance = docker.run(image.image);
+    let db_url = format!(
+        "postgres://{}:password@127.0.0.1:{}/{}",
+        image.user,
+        instance.get_host_port_ipv4(5432),
+        image.db
+    );
+    let mut conn = establish_connection(db_url.clone()).unwrap();
+    common::run_migrations(&mut conn)
+        .expect("Failed to run migrations");
+    // Set up endpoint
     let mut server = Server::new_async().await;
-    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let (private_key, kid, mock, jwks_url) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    
+    // App config
+    let config = Config::new(db_url.clone(),"test_issuer".to_string(),jwks_url);
     let now = chrono::Utc::now().timestamp() as u64; 
     let user_uuid = uuid::Uuid::new_v4();
     let claims = AccessTokenClaims {
         sub: user_uuid,
         nickname: "test".to_owned(),
         email_verified: true,
-        iss: "test".to_owned(),
+        iss: "test_issuer".to_owned(),
         aud: "test".to_owned(),
         exp: now + 100,
         iat: now - 100,
@@ -309,6 +437,7 @@ async fn test_get_user_invalid_url_uuid() {
     // Create test server
     let app = test::init_service(
         App::new()
+        .app_data(web::Data::new(config))
         .route("/users/{id}", web::get().to(get_user))
         ).await;
 
@@ -324,15 +453,31 @@ async fn test_get_user_invalid_url_uuid() {
 
 #[actix_web::test]
 async fn test_get_user_different_user_doesnt_exist() {
-    // Create token
+    // Set up docker
+    let docker = Cli::default();
+    let image = common::container_setup();
+    let instance = docker.run(image.image);
+    let db_url = format!(
+        "postgres://{}:password@127.0.0.1:{}/{}",
+        image.user,
+        instance.get_host_port_ipv4(5432),
+        image.db
+    );
+    let mut conn = establish_connection(db_url.clone()).unwrap();
+    common::run_migrations(&mut conn)
+        .expect("Failed to run migrations");
+    // Set up endpoint
     let mut server = Server::new_async().await;
-    let (private_key, kid, mock) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    let (private_key, kid, mock, jwks_url) = common::set_up_jwks_endpoint(&mut server, 5).await;
+    
+    // App config
+    let config = Config::new(db_url.clone(),"test_issuer".to_string(),jwks_url);
     let now = chrono::Utc::now().timestamp() as u64; 
     let claims = AccessTokenClaims {
         sub: uuid::Uuid::new_v4(),
         nickname: "test".to_owned(),
         email_verified: true,
-        iss: "test".to_owned(),
+        iss: "test_issuer".to_owned(),
         aud: "test".to_owned(),
         exp: now + 100,
         iat: now - 100,
@@ -352,6 +497,7 @@ async fn test_get_user_different_user_doesnt_exist() {
     // Create test server
     let app = test::init_service(
         App::new()
+        .app_data(web::Data::new(config))
         .route("/users/{id}", web::get().to(get_user))
         ).await;
 
@@ -364,7 +510,6 @@ async fn test_get_user_different_user_doesnt_exist() {
     mock.assert_async().await;
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
-
 /*
 #[actix_web::test]
 async fn test_get_user_error_selecting() {

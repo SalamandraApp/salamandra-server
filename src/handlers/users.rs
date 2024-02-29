@@ -2,12 +2,14 @@ use actix_web::{web, Responder, HttpRequest, HttpResponse};
 use serde_json::json;
 
 use crate::db::{execute_db_operation, insert_new_user, select_user};
-use crate::models::user::User;
+use crate::models::user::*;
 use crate::utils::auth::{handle_protected_call, ProtectedCallError};
 use crate::utils::log::log_db_error;
+use crate::Config;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.route("/{user_id}", web::get().to(get_user));
+    cfg.route("/{user_id}", web::get().to(get_user))
+        .route("/search", web::get().to(search_users));
 }
 
 /// Gets user info, inserts it if its new
@@ -18,13 +20,9 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 /// # Returns
 /// * Unsuccessful http response
 /// * User json for new or existing user
-pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl Responder {
-    
-    // TODO:
-    // - make new tests
-    // - update for new authentication
-    // - make possible to get other users
-    let claims = match handle_protected_call(req).await {
+pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>, config: web::Data<Config>) -> impl Responder {
+   
+    let claims = match handle_protected_call(req, &config.jwks_url, &config.issuer).await {
         Ok(claims) => claims,
         Err(error) => match error {
             // TODO: logging
@@ -44,7 +42,8 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
         Err(_) => return HttpResponse::BadRequest().json(json!({"error": "Invalid user id format"})),
     };
 
-    let select_result = match execute_db_operation(Box::new(move |conn| select_user(conn, url_uuid))).await {
+    let db_url = config.db_url.clone();
+    let select_result = match execute_db_operation(Box::new(move |conn| select_user(conn, url_uuid)), db_url).await {
         Ok(vec) => vec,
         Err(error) => {
             log_db_error(error);
@@ -54,7 +53,7 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
 
     // New user
     // TODO: 
-    // - change visivility of user struct if not getting own profile
+    // - change visibility of user struct if not getting own profile
     let len = select_result.len();
     if len == 0 {
         // Looking for different user than one calling
@@ -76,7 +75,8 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
 
         // Insert into db
         let user_db = new_user.clone();
-        match execute_db_operation(Box::new(move |conn| insert_new_user(conn, user_db))).await {
+        let db_url = config.db_url.clone();
+        match execute_db_operation(Box::new(move |conn| insert_new_user(conn, user_db)), db_url).await {
             Ok(_) => HttpResponse::Created().json(new_user),
             Err(error) => {
                 log_db_error(error);
@@ -94,4 +94,16 @@ pub async fn get_user(req: HttpRequest, url_user_id: web::Path<String>) -> impl 
         println!("Error selecting more than 2");
         HttpResponse::InternalServerError().finish()
     }
+}
+
+
+/// Retrieve list of users based on a term
+/// # Arguments
+/// * /search?username=value
+///
+/// # Returns
+/// * List of matching (username, uuid) pairs
+pub async fn search_users(query: web::Query<UserSearchParams>) -> impl Responder {
+    let _username = &query.username;
+    HttpResponse::NotImplemented().finish()
 }

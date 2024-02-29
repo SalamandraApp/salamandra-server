@@ -1,6 +1,6 @@
 use diesel::prelude::*;
 use uuid::Uuid;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
 #[derive(Queryable, Serialize, Insertable, Clone)]
 #[diesel(table_name = crate::schema::users)]
@@ -16,3 +16,23 @@ pub struct User {
     pub height: Option<i32>,
 }
 
+#[derive(Deserialize)]
+pub struct UserSearchParams {
+    pub username: String,
+    /*
+    Maybe
+    pub display_name: String,
+    pub location: String
+    */
+}
+
+#[derive(Serialize)]
+pub struct UserSearchResult {
+    pub users: Vec<UserInfo>,
+}
+
+#[derive(Serialize)]
+pub struct UserInfo {
+    pub username: String,
+    pub uuid: uuid::Uuid,
+}

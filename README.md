@@ -1,4 +1,10 @@
+![][rust-banner.png]
+
 # Server for Salamandra App
+
+1. [Dependencies](#dependencies)
+2. [Testing Locally](#testing-locally)
+3. [Endpoints](#endpoints)
 
 ## Dependencies
  - Install rust
@@ -29,3 +35,7 @@ cd salamandra-server
 chmod +x test_local
 ./test_local
 ```
+
+## Endpoints
+ - GET `/users/{user_id}` (Protected)
+ - GET `/users/search?username=val`
