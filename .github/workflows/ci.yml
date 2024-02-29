@@ -1,3 +1,4 @@
+
 name: Rust CI
 
 on:
@@ -11,34 +12,34 @@ jobs:
     runs-on: ubuntu-latest
     services:
       docker:
-        image: docker:19.03.12
-        options: --privileged
+        image: docker:dind  # Use the Docker-in-Docker image
         ports:
           - 2375:2375
+
     env:
       DOCKER_HOST: tcp://localhost:2375
 
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - name: Set up Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
 
-    - name: Install system dependencies
-      run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
 
-    - name: Install Diesel CLI
-      run: cargo install diesel_cli --no-default-features --features postgres
+      - name: Install Diesel CLI
+        run: cargo install diesel_cli --no-default-features --features postgres
 
-    - name: Set up Docker
-      uses: docker/setup-docker@v1
-      with:
-        version: '19.03'
+      - name: Install Docker
+        run: |
+          curl -fsSL https://get.docker.com | sh
+          sudo usermod -aG docker $USER
 
-    - name: Build and test
-      run: RUST_BACKTRACE=1 cargo test
+      - name: Build and test
+        run: RUST_BACKTRACE=1 cargo test
 
