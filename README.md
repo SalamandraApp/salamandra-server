@@ -3,8 +3,7 @@
 # Server for Salamandra App
 
 1. [Dependencies](#dependencies)
-2. [Testing Locally](#testing-locally)
-3. [Endpoints](#endpoints)
+2. [Endpoints](#endpoints)
 
 ## Dependencies
  - Install rust
@@ -27,13 +26,6 @@ curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
 ```
 sudo apt-get update
 sudo apt-get install pkg-config libssl-dev libpq-dev docker-compose
-```
-
-## Testing locally
-```bash
-cd salamandra-server
-chmod +x test_local
-./test_local
 ```
 
 ## Endpoints
