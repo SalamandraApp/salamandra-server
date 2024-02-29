@@ -1,4 +1,4 @@
-![][rust-banner.png]
+![](rust-banner.png)
 
 # Server for Salamandra App
 
