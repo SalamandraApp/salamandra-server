@@ -1,8 +1,7 @@
 use lambda_runtime::{run, service_fn, Error, LambdaEvent};
 use serde::{Deserialize, Serialize};
 
-use salamandra_server::models::user_models::User;
-
+use salamandra_server::lib::models::user_models::User;
 
 #[derive(Deserialize)]
 struct Request {

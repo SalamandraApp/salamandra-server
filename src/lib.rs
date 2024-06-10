@@ -1,3 +1,6 @@
-pub mod db;
-pub mod models;
-mod schema;
+pub mod lib {
+    pub mod db;
+    pub mod models;
+    pub mod errors;
+}
+pub mod schema;
