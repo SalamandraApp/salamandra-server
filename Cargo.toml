@@ -1,23 +1,29 @@
 [package]
-name = "test-api"
-version = "0.1.0"
+name = "salamandra-server"
+version = "0.2.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lambda_runtime = "0.11.2"
 
-lambda_runtime = "0.6.0"
-serde = "1.0.136"
-tokio = { version = "1", features = ["macros"] }
+# Database
+diesel = { version = "2.1.4", features = ["postgres", "chrono", "uuid", "r2d2"] }
+
+# Essential
+tokio = {version="1.37.0", features=["full"]}
+serde = {version ="1.0", features = ["derive"]}
+
+# Datatypes
+uuid = { version = "1.6.1", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging and Monitoring
 tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
 
 
 [[bin]]
 name = "hello"
-path = "src/hello.rs"
+path = "src/bin/users/get_user.rs"
 
-[[bin]]
-name = "goodbye"
-path = "src/goodbye.rs"
