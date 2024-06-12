@@ -3,9 +3,7 @@
 diesel::table! {
     users (id) {
         id -> Uuid,
-        #[max_length = 255]
         username -> Varchar,
-        #[max_length = 255]
         display_name -> Varchar,
         date_joined -> Timestamptz,
         date_of_birth -> Nullable<Date>,

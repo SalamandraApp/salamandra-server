@@ -5,14 +5,19 @@ edition = "2021"
 
 
 [dependencies]
-lambda_runtime = "0.11.2"
+lambda_http = "0.11.1"
 
 # Database
-diesel = { version = "2.1.4", features = ["postgres", "chrono", "uuid", "r2d2"] }
+diesel = { version = "2.1.6", features = ["postgres", "chrono", "uuid"] }
+diesel-async = { version = "0.4.1", features = ["postgres", "bb8"] }
+diesel_async_migrations = "0.12.0"
+bb8 = "0.8.3"
 
 # Essential
 tokio = {version="1.37.0", features=["full"]}
 serde = {version ="1.0", features = ["derive"]}
+serde_json = "1.0"
+once_cell = "1.19.0"
 
 # Datatypes
 uuid = { version = "1.6.1", features = ["serde", "v4"] }
@@ -21,9 +26,11 @@ chrono = { version = "0.4", features = ["serde"] }
 # Logging and Monitoring
 tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
+testcontainers = "0.17.0"
+testcontainers-modules = {version = "0.5.0", features = ["postgres"]}
+anyhow = "1.0.86"
 
 
 [[bin]]
-name = "hello"
+name = "get_user"
 path = "src/bin/users/get_user.rs"
-
