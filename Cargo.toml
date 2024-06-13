@@ -39,3 +39,7 @@ path = "src/bin/users/get_user.rs"
 [[bin]]
 name = "create_user"
 path = "src/bin/users/create_user.rs"
+
+[[bin]]
+name = "search_user"
+path = "src/bin/users/search_users.rs"

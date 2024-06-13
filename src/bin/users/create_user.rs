@@ -70,7 +70,7 @@ mod tests {
             let payload = MissingFields {field: 1};
 
             let mut req = Request::default();
-            *req.uri_mut() = "/users/{}".parse().unwrap();
+            *req.uri_mut() = "/users".parse().unwrap();
             *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
 
             let resp = create_user(req, Some(pool.clone())).await;
@@ -86,7 +86,7 @@ mod tests {
             };
 
             let mut req = Request::default();
-            *req.uri_mut() = "/users/{}".parse().unwrap();
+            *req.uri_mut() = "/users".parse().unwrap();
             *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
 
             let resp = create_user(req, Some(pool.clone())).await;
@@ -98,7 +98,7 @@ mod tests {
         {   // ------  No Payload
 
             let mut req = Request::default();
-            *req.uri_mut() = "/users/{}".parse().unwrap();
+            *req.uri_mut() = "/users".parse().unwrap();
 
             let resp = create_user(req, Some(pool)).await;
             assert!(resp.is_ok());
