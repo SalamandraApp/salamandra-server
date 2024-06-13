@@ -8,7 +8,7 @@ use testcontainers_modules::{
 use crate::lib::db::{DBPool, create_pool};
 use crate::lib::models::user_models::User;
 use crate::lib::db::users_db::insert_user;
-
+ 
 pub const MIGRATIONS: diesel_async_migrations::EmbeddedMigrations = diesel_async_migrations::embed_migrations!();
 
 pub async fn pg_container() -> (DBPool, ContainerAsync<postgres::Postgres>) {
