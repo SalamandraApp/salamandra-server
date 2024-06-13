@@ -3,6 +3,7 @@ pub enum DBError {
     ConnectionError(String),
     OperationError(String),
     ItemNotFound(String),
+    UniqueViolation(String),
 }
 
 impl std::fmt::Display for DBError {
@@ -11,6 +12,7 @@ impl std::fmt::Display for DBError {
             DBError::ConnectionError(msg) => write!(f, "ConnectionError: {}", msg),
             DBError::OperationError(msg) => write!(f, "OperationError: {}", msg),
             DBError::ItemNotFound(msg) => write!(f, "ItemNotFound: {}", msg),
+            DBError::UniqueViolation(msg) => write!(f, "UniqueViolation: {}", msg),
         }
     }
 }

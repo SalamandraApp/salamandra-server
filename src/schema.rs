@@ -5,7 +5,7 @@ diesel::table! {
         id -> Uuid,
         username -> Varchar,
         display_name -> Varchar,
-        date_joined -> Timestamptz,
+        date_joined -> Date,
         date_of_birth -> Nullable<Date>,
         height -> Nullable<Int4>,
         weight -> Nullable<Float4>,
