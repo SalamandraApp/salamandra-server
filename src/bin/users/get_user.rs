@@ -10,14 +10,12 @@ use salamandra_server::lib::errors::DBError;
 
 async fn get_user(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
 
-    let path_parameters = event.path_parameters();
-    let user_id = path_parameters.first("user-id").unwrap_or("No ID provided");
-    let id = match Uuid::parse_str(user_id) {
-        Ok(id) => id,
-        Err(_) => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid user-id"))
+    let user_id = match event.path_parameters().first("user_id").and_then(|s| Uuid::parse_str(s).ok()) {
+        Some(id) => id,
+        None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid user_id")),
     };
 
-    match lookup_user(id, test_db).await {
+    match lookup_user(user_id, test_db).await {
         Ok(user) => Ok(build_resp(StatusCode::OK, user)),
         Err(DBError::ItemNotFound(mes)) => Ok(build_resp(StatusCode::NOT_FOUND, mes)),
         Err(_) => Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
@@ -47,9 +45,8 @@ mod tests {
 
         let (pool, _container) = pg_container().await;
         let user_id = String::from("INVALID-UUID");
-        let mut req = Request::default();
-        *req.uri_mut() = format!("/users/{}", user_id).parse().unwrap();
-        let req = req.with_path_parameters(HashMap::from([("user-id".to_string(), user_id)]));
+        let req = Request::default();
+        let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id)]));
         
         let resp = get_user(req, Some(pool)).await;
         assert!(resp.is_ok());
@@ -61,9 +58,8 @@ mod tests {
     async fn test_get_user_not_found() {
         let (pool, _container) = pg_container().await;
         let user_id = Uuid::new_v4().to_string();
-        let mut req = Request::default();
-        *req.uri_mut() = format!("/users/{}", user_id).parse().unwrap();
-        let req = req.clone().with_path_parameters(HashMap::from([("user-id".to_string(), user_id)]));
+        let req = Request::default();
+        let req = req.clone().with_path_parameters(HashMap::from([("user_id".to_string(), user_id)]));
         
         let resp = get_user(req, Some(pool)).await;
         assert!(resp.is_ok());
@@ -76,9 +72,8 @@ mod tests {
         let (pool, _container) = pg_container().await;
         let user = User::default();
         let user_id = user.id.to_string();
-        let mut req = Request::default();
-        *req.uri_mut() = format!("/users/{}", user_id).parse().unwrap();
-        let req = req.clone().with_path_parameters(HashMap::from([("user-id".to_string(), user_id)]));
+        let req = Request::default();
+        let req = req.clone().with_path_parameters(HashMap::from([("user_id".to_string(), user_id)]));
        
         let _ = insert_user(&user, Some(pool.clone())).await;
         let resp = get_user(req, Some(pool)).await;

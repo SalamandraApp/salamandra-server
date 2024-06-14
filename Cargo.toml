@@ -23,15 +23,15 @@ once_cell = "1.19.0"
 uuid = { version = "1.6.1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 base64 = "0.22.1"
+jsonwebtoken = "9.3.0"
 
 # Logging and Monitoring
 tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
 testcontainers = "0.17.0"
 testcontainers-modules = {version = "0.5.0", features = ["postgres"]}
-anyhow = "1.0.86"
 
-
+# ------------------- USERS
 [[bin]]
 name = "get_user"
 path = "src/bin/users/get_user.rs"
@@ -41,5 +41,29 @@ name = "create_user"
 path = "src/bin/users/create_user.rs"
 
 [[bin]]
-name = "search_user"
+name = "search_users"
 path = "src/bin/users/search_users.rs"
+
+
+# ------------------- EXERCISES
+[[bin]]
+name = "get_exercise"
+path = "src/bin/exercises/get_exercise.rs"
+
+[[bin]]
+name = "search_exercises"
+path = "src/bin/exercises/search_exercises.rs"
+
+
+# ------------------- WORKOUT TEMPLATES
+[[bin]]
+name = "get_all_workout_templates"
+path = "src/bin/workout-templates/get_all_workout_templates.rs"
+
+[[bin]]
+name = "delete_workout_template"
+path = "src/bin/workout-templates/delete_workout_template.rs"
+
+[[bin]]
+name = "create_workout_template"
+path = "src/bin/workout-templates/create_workout_template.rs"

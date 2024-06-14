@@ -1,4 +1,7 @@
 pub mod users_db;
+pub mod exercises_db;
+pub mod workout_templates_db;
+pub mod wk_template_elements_db;
 
 use bb8::Pool;
 use diesel_async::{pooled_connection::AsyncDieselConnectionManager, AsyncPgConnection};

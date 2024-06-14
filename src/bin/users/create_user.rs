@@ -10,9 +10,9 @@ use salamandra_server::lib::errors::DBError;
 use salamandra_server::lib::utils::handlers::build_resp;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CreateUserRequest {
-    pub uuid: Uuid,
-    pub username: String,
+struct CreateUserRequest {
+    uuid: Uuid,
+    username: String,
 }
 
 async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
@@ -51,14 +51,14 @@ mod tests {
     use salamandra_server::lib::utils::tests::pg_container;
 
     #[derive(Debug, Serialize, Deserialize)]
-    pub struct MissingFields {
-        pub field: i32,
+    struct MissingFields {
+        field: i32,
     }
     
     #[derive(Debug, Serialize, Deserialize)]
-    pub struct DifferentTypes {
-        pub uuid: i32,
-        pub username: String,
+    struct DifferentTypes {
+        uuid: i32,
+        username: String,
     }
 
 
@@ -70,7 +70,6 @@ mod tests {
             let payload = MissingFields {field: 1};
 
             let mut req = Request::default();
-            *req.uri_mut() = "/users".parse().unwrap();
             *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
 
             let resp = create_user(req, Some(pool.clone())).await;
@@ -86,7 +85,6 @@ mod tests {
             };
 
             let mut req = Request::default();
-            *req.uri_mut() = "/users".parse().unwrap();
             *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
 
             let resp = create_user(req, Some(pool.clone())).await;
@@ -97,8 +95,7 @@ mod tests {
 
         {   // ------  No Payload
 
-            let mut req = Request::default();
-            *req.uri_mut() = "/users".parse().unwrap();
+            let req = Request::default();
 
             let resp = create_user(req, Some(pool)).await;
             assert!(resp.is_ok());
@@ -117,7 +114,6 @@ mod tests {
         };
 
         let mut req = Request::default();
-        *req.uri_mut() = "/users".parse().unwrap();
         *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
         
         let resp = create_user(req.clone(), Some(pool.clone())).await;
@@ -142,7 +138,6 @@ mod tests {
         };
 
         let mut req = Request::default();
-        *req.uri_mut() = "/users".parse().unwrap();
         *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
         
         let resp = create_user(req, Some(pool)).await;
