@@ -61,6 +61,10 @@ name = "get_all_workout_templates"
 path = "src/bin/workout-templates/get_all_workout_templates.rs"
 
 [[bin]]
+name = "get_workout_template"
+path = "src/bin/workout-templates/get_workout_template.rs"
+
+[[bin]]
 name = "delete_workout_template"
 path = "src/bin/workout-templates/delete_workout_template.rs"
 

@@ -10,10 +10,12 @@ use testcontainers_modules::{
 use crate::lib::models::exercise_models::NewExercise;
 use crate::lib::models::user_models::User;
 use crate::lib::models::workout_templates_models::NewWorkoutTemplate;
+use crate::lib::models::wk_template_elements::NewWkTemplateElement;
 use crate::lib::db::{DBPool, create_pool};
 use crate::lib::db::exercises_db::insert_exercise;
 use crate::lib::db::users_db::insert_user;
 use crate::lib::db::workout_templates_db::insert_workout_template;
+use crate::lib::db::wk_template_elements_db::insert_batch_wk_template_elements;
  
 pub const MIGRATIONS: diesel_async_migrations::EmbeddedMigrations = diesel_async_migrations::embed_migrations!();
 
@@ -88,12 +90,27 @@ pub async fn insert_helper(n: usize, items: Items, db_pool: DBPool, name_prefix:
                 ids.push(insert_res.unwrap().id);
             }
         },
-        Items::WKTemplates => {
+        Items::WkTemplates => {
             let new_user_id = Box::pin(insert_helper(1, Items::Users, db_pool.clone(), None)).await[0];
             for _ in 0..n {
                 let new_template = NewWorkoutTemplate { user_id: new_user_id.clone(), ..Default::default() };
                 let insert_res = insert_workout_template(&new_template, Some(db_pool.clone())).await;
                 ids.push(insert_res.unwrap().id);
+            }
+        },
+        Items::WkTemplateElements => {
+            let workout_template_id = Box::pin(insert_helper(1, Items::WkTemplates, db_pool.clone(), None)).await.into_iter().next().unwrap();
+            let exercise_ids = Box::pin(insert_helper(
+                    n,
+                    Items::Exercises,
+                    db_pool.clone(), 
+                    Some("Push-up".to_string()), 
+                    )
+                                       ).await;
+            for i in 0..n {
+                let new_element = NewWkTemplateElement{ workout_template_id, exercise_id: exercise_ids[i], ..Default::default() };
+                let insert_res = insert_batch_wk_template_elements(&vec![new_element], Some(db_pool.clone())).await;
+                ids.push(insert_res.unwrap().into_iter().next().unwrap().id);
             }
         },
     }
@@ -103,7 +120,8 @@ pub async fn insert_helper(n: usize, items: Items, db_pool: DBPool, name_prefix:
 pub enum Items {
     Users,
     Exercises,
-    WKTemplates,
+    WkTemplates,
+    WkTemplateElements
 }
 
 

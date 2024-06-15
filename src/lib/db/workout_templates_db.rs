@@ -48,7 +48,7 @@ pub async fn lookup_workout_template(template_id: Uuid, test_db: Option<DBPool>)
         .await
         .map_err(|error| {
             if error == Error::NotFound {
-                DBError::ItemNotFound("No workout_template exists with the corresponding id".to_string())
+                DBError::ItemNotFound("No template exists with the corresponding id".to_string())
             } else {
                 DBError::OperationError(error.to_string())
             }
@@ -166,7 +166,7 @@ mod tests {
     async fn test_delete_workout_template_success() {
         let (db_pool, _container) = pg_container().await;
 
-        let new_template_id = insert_helper(1, Items::WKTemplates, db_pool.clone(), None).await[0];
+        let new_template_id = insert_helper(1, Items::WkTemplates, db_pool.clone(), None).await[0];
 
         let read_res1 = lookup_workout_template(new_template_id.clone(), Some(db_pool.clone())).await;
         assert!(read_res1.is_ok());

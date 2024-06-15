@@ -87,7 +87,7 @@ mod tests {
     async fn test_get_all_workout_multiple() {
         let (pool, _container) = pg_container().await;
         
-        let wk_templates = insert_helper(5, Items::WKTemplates, pool.clone(), None).await;
+        let wk_templates = insert_helper(5, Items::WkTemplates, pool.clone(), None).await;
         let user_id = lookup_workout_template(wk_templates[0], Some(pool.clone())).await.unwrap().user_id;
         let user_id_string = user_id.to_string();
         let jwt = test_jwt(user_id);

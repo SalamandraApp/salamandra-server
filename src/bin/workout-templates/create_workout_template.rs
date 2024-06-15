@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use salamandra_server::lib::db::exercises_db::validate_exercises;
 use salamandra_server::lib::db::workout_templates_db::{insert_workout_template, delete_workout_template};
-use salamandra_server::lib::db::wk_template_elements_db::insert_batch_template_elements;
+use salamandra_server::lib::db::wk_template_elements_db::insert_batch_wk_template_elements;
 use salamandra_server::lib::db::DBPool;
 use salamandra_server::lib::models::workout_templates_models::NewWorkoutTemplate;
 use salamandra_server::lib::models::wk_template_elements::NewWkTemplateElement;
@@ -105,7 +105,7 @@ async fn create_workout_template(event: Request, test_db: Option<DBPool>) -> Res
     }
 
     // Insert template elements
-    match insert_batch_template_elements(&new_template_elements, test_db.clone()).await {
+    match insert_batch_wk_template_elements(&new_template_elements, test_db.clone()).await {
         Ok(_) => Ok(build_resp(StatusCode::CREATED, new_workout_template)),
         Err(DBError::ConnectionError(_)) => Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
         Err(_) => {
