@@ -12,7 +12,7 @@ async fn get_exercise(event: Request, test_db: Option<DBPool>) -> Result<Respons
 
     let exercise_id = match event.path_parameters().first("exercise_id").and_then(|s| Uuid::parse_str(s).ok()) {
         Some(id) => id,
-        None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid user_id")),
+        None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid exercise_id")),
     };
 
     match lookup_exercise(exercise_id, test_db).await {
