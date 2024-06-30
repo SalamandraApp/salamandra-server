@@ -9,7 +9,7 @@ use salamandra_server::lib::db::workout_templates_db::{insert_workout_template, 
 use salamandra_server::lib::db::wk_template_elements_db::insert_batch_wk_template_elements;
 use salamandra_server::lib::db::DBPool;
 use salamandra_server::lib::models::workout_templates_models::NewWorkoutTemplate;
-use salamandra_server::lib::models::wk_template_elements::NewWkTemplateElement;
+use salamandra_server::lib::models::wk_template_elements_models::NewWkTemplateElement;
 use salamandra_server::lib::utils::handlers::{build_resp, extract_sub};
 use salamandra_server::lib::errors::DBError;
 

@@ -10,7 +10,7 @@ use salamandra_server::lib::db::DBPool;
 use salamandra_server::lib::errors::DBError;
 
 
-use salamandra_server::lib::models::wk_template_elements::WkTemplateElementDetailed;
+use salamandra_server::lib::models::wk_template_elements_models::WkTemplateElementDetailed;
 #[derive(Serialize, Deserialize)]
 pub struct GetTemplateResponse {
     pub id: Uuid,

@@ -2,6 +2,7 @@ use lambda_http::{run, service_fn, Error, Request, Response, Body, tracing};
 use lambda_http::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use chrono::NaiveDate;
 
 use salamandra_server::lib::models::user_models::User;
 use salamandra_server::lib::db::users_db::insert_user;
@@ -13,6 +14,7 @@ use salamandra_server::lib::utils::handlers::build_resp;
 struct CreateUserRequest {
     uuid: Uuid,
     username: String,
+    date_joined: NaiveDate,
 }
 
 async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
@@ -22,6 +24,7 @@ async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Response
             let new_user = User {
                 id: req.uuid,
                 username: req.username,
+                date_joined: req.date_joined,
                 ..Default::default()
             };
             let resp = match insert_user(&new_user, test_db).await {
@@ -46,6 +49,7 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
     use serde_json::to_string;
     use uuid::Uuid;
     use salamandra_server::lib::utils::tests::pg_container;
@@ -59,6 +63,7 @@ mod tests {
     struct DifferentTypes {
         uuid: i32,
         username: String,
+        date_joined: String,
     }
 
 
@@ -82,6 +87,7 @@ mod tests {
             let payload = DifferentTypes {
                 uuid: 1,
                 username: "username".to_string(),
+                date_joined: "date".to_string(),
             };
 
             let mut req = Request::default();
@@ -111,6 +117,7 @@ mod tests {
         let payload = CreateUserRequest {
             uuid: user_id,
             username: "username".to_string(),
+            date_joined: Utc::now().naive_utc().date(),
         };
 
         let mut req = Request::default();
@@ -135,6 +142,7 @@ mod tests {
         let payload = CreateUserRequest {
             uuid: user_id,
             username: "username".to_string(),
+            date_joined: Utc::now().naive_utc().date(),
         };
 
         let mut req = Request::default();

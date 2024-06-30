@@ -10,7 +10,7 @@ use testcontainers_modules::{
 use crate::lib::models::exercise_models::NewExercise;
 use crate::lib::models::user_models::User;
 use crate::lib::models::workout_templates_models::NewWorkoutTemplate;
-use crate::lib::models::wk_template_elements::NewWkTemplateElement;
+use crate::lib::models::wk_template_elements_models::NewWkTemplateElement;
 use crate::lib::db::{DBPool, create_pool};
 use crate::lib::db::exercises_db::insert_exercise;
 use crate::lib::db::users_db::insert_user;

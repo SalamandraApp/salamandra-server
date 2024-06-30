@@ -43,7 +43,7 @@ pub struct GetAllTemplatesResponse {
     pub templates: Vec<WorkoutTemplate>
 }
 
-use crate::lib::models::wk_template_elements::WkTemplateElementDetailed;
+use crate::lib::models::wk_template_elements_models::WkTemplateElementDetailed;
 #[derive(Serialize, Deserialize)]
 pub struct GetTemplateResponse {
     pub id: Uuid,

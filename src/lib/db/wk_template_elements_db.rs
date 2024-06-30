@@ -4,7 +4,7 @@ use diesel_async::RunQueryDsl;
 use uuid::Uuid;
 
 use crate::schema::wktemplateelements::dsl::*;
-use crate::lib::models::wk_template_elements::{NewWkTemplateElement, WkTemplateElement, WkTemplateElementDetailed};
+use crate::lib::models::wk_template_elements_models::{NewWkTemplateElement, WkTemplateElement, WkTemplateElementDetailed};
 use crate::lib::errors::DBError;
 
 use super::{get_db_pool, DBPool};
