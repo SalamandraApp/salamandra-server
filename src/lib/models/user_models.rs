@@ -15,8 +15,8 @@ pub struct User {
     pub height: Option<i32>,
     pub weight: Option<f32>,
     pub gender: Option<i32>,
-    pub fitness_goal: i32,
-    pub fitness_level: i32,
+    pub fitness_goal: Option<i32>,
+    pub fitness_level: Option<i32>,
 }
 impl Default for User {
     fn default() -> Self {
@@ -29,8 +29,8 @@ impl Default for User {
             height: None,
             weight: None,
             gender: None,
-            fitness_goal: 0,
-            fitness_level: 0,
+            fitness_goal: None,
+            fitness_level: None,
         }
     }
 }

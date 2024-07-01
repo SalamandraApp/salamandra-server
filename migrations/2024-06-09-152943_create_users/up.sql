@@ -9,6 +9,6 @@ CREATE TABLE Users (
     height INT,
     weight FLOAT4,
     gender INT,
-    fitness_goal INT NOT NULL,
-    fitness_level INT NOT NULL
+    fitness_goal INT,
+    fitness_level INT
 );

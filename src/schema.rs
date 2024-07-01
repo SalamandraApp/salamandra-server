@@ -22,8 +22,8 @@ diesel::table! {
         height -> Nullable<Int4>,
         weight -> Nullable<Float4>,
         gender -> Nullable<Int4>,
-        fitness_goal -> Int4,
-        fitness_level -> Int4,
+        fitness_goal -> Nullable<Int4>,
+        fitness_level -> Nullable<Int4>,
     }
 }
 
