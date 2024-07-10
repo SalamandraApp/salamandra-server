@@ -18,7 +18,7 @@ async fn main() -> Result<(), Error> {
 async fn router(event: Request) -> Result<Response<Body>, Error> {
     let path = event.uri().path();
     let response = match (event.method(), path) {
-        (&Method::GET, _) if Regex::new(r"^/exercises/\w+$").unwrap().is_match(path) => get_exercise(event, None).await,
+        (&Method::GET, _) if Regex::new(r"^/exercises/[a-fA-F0-9-]+$").unwrap().is_match(path) => get_exercise(event, None).await,
         (&Method::GET, "/exercises") => search_exercises_(event, None).await,
         _ => Ok(Response::builder()
                 .status(404)

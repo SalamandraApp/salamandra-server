@@ -20,15 +20,17 @@ async fn main() -> Result<(), Error> {
 async fn router(event: Request) -> Result<Response<Body>, Error> {
     let path = event.uri().path();
     let response = match (event.method(), path) {
-        (&Method::GET, _) if Regex::new(r"^/users/\w+$").unwrap().is_match(path) => get_user(event, None).await,
+        (&Method::GET, _) if Regex::new(r"^/users/[a-fA-F0-9-]+$").unwrap().is_match(path) => get_user(event, None).await,
         (&Method::POST, "/users") => create_user(event, None).await,
         (&Method::GET, "/users") => search_users(event, None).await,
-        _ => Ok(Response::builder()
+        _ => {
+            println!("Unmatched route: Method: {}, URI: {}", event.method(), event.uri().path());
+            Ok(Response::builder()
                 .status(404)
                 .body("Not Found".into())
-                .expect("Failed to render response")),
+                .expect("Failed to render response"))
+        }
     };
-
     response
 }
 

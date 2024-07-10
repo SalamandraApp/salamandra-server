@@ -22,10 +22,10 @@ async fn main() -> Result<(), Error> {
 async fn router(event: Request) -> Result<Response<Body>, Error> {
     let path = event.uri().path();
     let response = match (event.method(), path) {
-        (&Method::POST, _) if Regex::new(r"^/users/\w+$/workout-templates").unwrap().is_match(path) => create_workout_template(event, None).await,
-        (&Method::DELETE, _) if Regex::new(r"^/users/\w+$/workout-templates/\w+$").unwrap().is_match(path) => delete_workout_template_(event, None).await,
-        (&Method::GET, _) if Regex::new(r"^/users/\w+$/workout-templates").unwrap().is_match(path) => get_all_workout_templates(event, None).await,
-        (&Method::GET, _) if Regex::new(r"^/users/\w+$/workout-templates/\w+$").unwrap().is_match(path) => get_workout_template(event, None).await,
+        (&Method::POST, _) if Regex::new(r"^/users/[a-fA-F0-9-]+$/workout-templates").unwrap().is_match(path) => create_workout_template(event, None).await,
+        (&Method::DELETE, _) if Regex::new(r"^/users/[a-fA-F0-9-]+$/workout-templates/[a-fA-F0-9-]+$").unwrap().is_match(path) => delete_workout_template_(event, None).await,
+        (&Method::GET, _) if Regex::new(r"^/users/[a-fA-F0-9-]+$/workout-templates").unwrap().is_match(path) => get_all_workout_templates(event, None).await,
+        (&Method::GET, _) if Regex::new(r"^/users/[a-fA-F0-9-]+$/workout-templates/[a-fA-F0-9-]+$").unwrap().is_match(path) => get_workout_template(event, None).await,
         _ => Ok(Response::builder()
                 .status(404)
                 .body("Not Found".into())
