@@ -1,4 +1,4 @@
-use lambda_http::{run, service_fn, Error, Request, Response, Body, tracing};
+use lambda_http::{Error, Request, Response, Body};
 use lambda_http::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -17,7 +17,7 @@ struct CreateUserRequest {
     date_joined: NaiveDate,
 }
 
-async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
+pub async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
 
     if let Body::Text(body) = event.into_body() {
         if let Ok(req) = serde_json::from_str::<CreateUserRequest>(&body) {
@@ -39,12 +39,6 @@ async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Response
     Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid payload"))
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    tracing::init_default_subscriber();
-    let handler = service_fn(|event| create_user(event, None));
-    run(handler).await
-}
 
 #[cfg(test)]
 mod tests {

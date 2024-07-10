@@ -1,4 +1,4 @@
-use lambda_http::{run, service_fn, Error, Request, Response, Body, RequestExt, tracing};
+use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
 use uuid::Uuid;
 
@@ -7,8 +7,7 @@ use salamandra_server::lib::utils::handlers::build_resp;
 use salamandra_server::lib::db::DBPool;
 use salamandra_server::lib::errors::DBError;
 
-
-async fn get_exercise(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
+pub async fn get_exercise(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
 
     let exercise_id = match event.path_parameters().first("exercise_id").and_then(|s| Uuid::parse_str(s).ok()) {
         Some(id) => id,
@@ -21,14 +20,6 @@ async fn get_exercise(event: Request, test_db: Option<DBPool>) -> Result<Respons
         Err(_) => Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
     }
 }
-
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    tracing::init_default_subscriber();
-    let handler = service_fn(|event| get_exercise(event, None));
-    run(handler).await
-}
-
 
 #[cfg(test)]
 mod tests {

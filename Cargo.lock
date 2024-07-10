@@ -1503,6 +1503,7 @@ dependencies = [
  "jsonwebtoken",
  "lambda_http",
  "once_cell",
+ "regex",
  "serde",
  "serde_json",
  "testcontainers",

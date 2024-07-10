@@ -1,4 +1,4 @@
-use lambda_http::{run, service_fn, Error, Request, Response, Body, RequestExt, tracing};
+use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ struct ExerciseSearchResult {
     exercises: Vec<Exercise>,
 }
 
-async fn search_exercises_handler(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
+pub async fn search_exercises_(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
 
     let name = match event.query_string_parameters().first("name") {
         Some(name) => name.to_string(),
@@ -27,15 +27,8 @@ async fn search_exercises_handler(event: Request, test_db: Option<DBPool>) -> Re
     };
     let result = ExerciseSearchResult { exercises: search_result};
     Ok(build_resp(StatusCode::OK, result))
-    
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    tracing::init_default_subscriber();
-    let handler = service_fn(|event| search_exercises_handler(event, None));
-    run(handler).await
-}
 
 #[cfg(test)]
 mod tests {
@@ -50,7 +43,7 @@ mod tests {
         { // ------ No query parameters
             let req_ = Request::default();
 
-            let resp = search_exercises_handler(req_, Some(pool.clone())).await;
+            let resp = search_exercises_(req_, Some(pool.clone())).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -62,7 +55,7 @@ mod tests {
             query_params.insert("not_username".to_string(), "Test".to_string());
             let req = req_.with_query_string_parameters(query_params);
 
-            let resp = search_exercises_handler(req, Some(pool.clone())).await;
+            let resp = search_exercises_(req, Some(pool.clone())).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -79,7 +72,7 @@ mod tests {
         let req = req_.with_query_string_parameters(query_params);
     
         let exercise_ids = insert_helper(5, Items::Exercises, pool.clone(), Some("Test".into())).await;
-        let resp = search_exercises_handler(req, Some(pool)).await;
+        let resp = search_exercises_(req, Some(pool)).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
