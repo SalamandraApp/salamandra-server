@@ -59,12 +59,16 @@ impl Default for NewWkTemplateElement {
 pub struct WkTemplateElementDetailed {
     pub id: Uuid,
     pub workout_template_id: Uuid,
-    pub exercise_id: Uuid,
-    pub exercise_name: String,
     pub position: i32,
     pub reps: i32,
     pub sets: i32,
     pub weight: i32,
     pub rest: i32,
     pub super_set: Option<i32>,
+    pub exercise_id: Uuid,
+    pub exercise_name: String,
+    pub main_muscle_group: Option<i32>,
+    pub secondary_muscle_group: Option<i32>,
+    pub necessary_equipment: Option<i32>,
+    pub exercise_type: Option<i32>,
 }

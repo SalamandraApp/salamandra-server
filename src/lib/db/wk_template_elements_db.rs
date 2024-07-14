@@ -58,6 +58,10 @@ use crate::schema::exercises::dsl::{
     exercises, 
     id as exercise_id_,
     name as exercise_name,
+    main_muscle_group,
+    secondary_muscle_group,
+    necessary_equipment,
+    exercise_type,
 };
 
 /// Selects detailed template elements by workout template ID.
@@ -78,14 +82,18 @@ pub async fn select_wk_template_element_detailed_by_template(wk_template_id: Uui
         .select((
             id,
             workout_template_id,
-            exercise_id_,
-            exercise_name,
             position,
             reps,
             sets,
             weight,
             rest,
             super_set,
+            exercise_id_,
+            exercise_name,
+            main_muscle_group,
+            secondary_muscle_group,
+            necessary_equipment,
+            exercise_type
         ))
         .load::<WkTemplateElementDetailed>(&mut conn)
         .await
