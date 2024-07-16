@@ -8,7 +8,7 @@ use salamandra_server::lib::models::user_models::User;
 use salamandra_server::lib::db::users_db::insert_user;
 use salamandra_server::lib::db::DBPool;
 use salamandra_server::lib::errors::DBError;
-use salamandra_server::lib::utils::handlers::build_resp;
+use salamandra_server::lib::utils::handlers::{build_resp, extract_sub};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct CreateUserRequest {
@@ -19,8 +19,12 @@ struct CreateUserRequest {
 
 pub async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
 
-    if let Body::Text(body) = event.into_body() {
+    if let Body::Text(body) = event.clone().into_body() {
         if let Ok(req) = serde_json::from_str::<CreateUserRequest>(&body) {
+            match extract_sub(event.headers(), Some(req.uuid)) {
+                Ok(_) => (),
+                Err(resp) => return Ok(resp)
+            };
             let new_user = User {
                 id: req.uuid,
                 username: req.username,
@@ -44,9 +48,10 @@ pub async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Resp
 mod tests {
     use super::*;
     use chrono::Utc;
+    use lambda_http::http::{header::AUTHORIZATION, HeaderValue};
     use serde_json::to_string;
     use uuid::Uuid;
-    use salamandra_server::lib::utils::tests::pg_container;
+    use salamandra_server::lib::utils::tests::{pg_container, test_jwt};
 
     #[derive(Debug, Serialize, Deserialize)]
     struct MissingFields {
@@ -64,11 +69,14 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_invalid_payload() {
         let (pool, _container) = pg_container().await;
+        let user_id = Uuid::new_v4();
 
         {   // ------ Different fields
             let payload = MissingFields {field: 1};
 
             let mut req = Request::default();
+            let jwt = test_jwt(user_id);
+            req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
             *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
 
             let resp = create_user(req, Some(pool.clone())).await;
@@ -85,6 +93,8 @@ mod tests {
             };
 
             let mut req = Request::default();
+            let jwt = test_jwt(user_id);
+            req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
             *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
 
             let resp = create_user(req, Some(pool.clone())).await;
@@ -95,8 +105,9 @@ mod tests {
 
         {   // ------  No Payload
 
-            let req = Request::default();
-
+            let mut req = Request::default();
+            let jwt = test_jwt(user_id);
+            req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
             let resp = create_user(req, Some(pool)).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
@@ -115,6 +126,8 @@ mod tests {
         };
 
         let mut req = Request::default();
+        let jwt = test_jwt(user_id);
+        req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
         *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
         
         let resp = create_user(req.clone(), Some(pool.clone())).await;
@@ -140,6 +153,8 @@ mod tests {
         };
 
         let mut req = Request::default();
+        let jwt = test_jwt(user_id);
+        req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
         *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
         
         let resp = create_user(req, Some(pool)).await;
