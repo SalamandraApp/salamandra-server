@@ -1,6 +1,6 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
-use serde::{Deserialize, Serialize};
+use salamandra_server::lib::models::workout_templates_models::{WorkoutTemplate, WorkoutTemplateFull};
 use uuid::Uuid;
 
 use salamandra_server::lib::db::workout_templates_db::lookup_workout_template;
@@ -10,16 +10,6 @@ use salamandra_server::lib::db::DBPool;
 use salamandra_server::lib::errors::DBError;
 
 
-use salamandra_server::lib::models::wk_template_elements_models::WkTemplateElementDetailed;
-#[derive(Serialize, Deserialize)]
-pub struct GetTemplateResponse {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub name: String,
-    pub description: Option<String>,
-    pub date_created: chrono::NaiveDate,
-    pub elements: Vec<WkTemplateElementDetailed>,
-}
 
 pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
 
@@ -51,13 +41,15 @@ pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Re
         Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
     };
 
-    // Crear modelos
-    let response = GetTemplateResponse {
-        id: template_id,
-        user_id: template.user_id,
-        name: template.name,
-        description: template.description,
-        date_created: template.date_created,
+    // Create models 
+    let response = WorkoutTemplateFull {
+        workout_template: WorkoutTemplate {
+            id: template_id,
+            user_id: template.user_id,
+            name: template.name,
+            description: template.description,
+            date_created: template.date_created,
+        },
         elements: detailed_elements.clone(),
     };
     Ok(build_resp(StatusCode::OK, response))
@@ -153,7 +145,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         if let Body::Text(body) = response.into_body() {
-            let template: Result<GetTemplateResponse, _> = serde_json::from_str(&body);
+            let template: Result<WorkoutTemplateFull, _> = serde_json::from_str(&body);
             let id_vec: Vec<Uuid> = template.unwrap().elements.iter().map(|wkt| wkt.id.clone()).collect();
             assert_eq!(id_vec.len(), 5);
             assert_eq!(id_vec, element_vector);

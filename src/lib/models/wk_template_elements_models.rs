@@ -7,7 +7,7 @@ use crate::lib::models::{
     exercise_models::Exercise,
 };
 
-#[derive(Queryable, Identifiable, Associations, Serialize)]
+#[derive(Serialize, Deserialize, Queryable, Identifiable, Associations)]
 #[diesel(table_name = wktemplateelements)]
 #[diesel(belongs_to(WorkoutTemplate))]
 #[diesel(belongs_to(Exercise))]
@@ -56,7 +56,7 @@ impl Default for NewWkTemplateElement {
 #[diesel(belongs_to(WorkoutTemplate))]
 #[diesel(belongs_to(Exercise))]
 #[diesel(table_name = wktemplateelements)]
-pub struct WkTemplateElementDetailed {
+pub struct WkTemplateElementFull{
     pub id: Uuid,
     pub workout_template_id: Uuid,
     pub position: i32,

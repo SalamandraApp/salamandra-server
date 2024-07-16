@@ -1,8 +1,10 @@
 use diesel::prelude::*;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
-use crate::lib::models::user_models::User;
+use super::user_models::User;
+use super::wk_template_elements_models::{WkTemplateElement, WkTemplateElementFull};
 use crate::schema::workouttemplates;
+
 
 
 #[derive(Queryable, Identifiable, Associations, Selectable, Serialize, Deserialize, Clone)]
@@ -37,20 +39,17 @@ impl Default for NewWorkoutTemplate {
     }
 }
 
+
 #[derive(Serialize, Deserialize)]
-pub struct GetAllTemplatesResponse {
-    pub count: usize,
-    pub templates: Vec<WorkoutTemplate>
+pub struct WkTemplateWithElements{
+    #[serde(flatten)]
+    pub workout_template: WorkoutTemplate,  
+    pub elements: Vec<WkTemplateElement>
 }
 
-use crate::lib::models::wk_template_elements_models::WkTemplateElementDetailed;
 #[derive(Serialize, Deserialize)]
-pub struct GetTemplateResponse {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub name: String,
-    pub description: Option<String>,
-    pub date_created: chrono::NaiveDate,
-    pub elements: Vec<WkTemplateElementDetailed>,
+pub struct WorkoutTemplateFull {
+    #[serde(flatten)]
+    pub workout_template: WorkoutTemplate,
+    pub elements: Vec<WkTemplateElementFull>,
 }
-

@@ -8,14 +8,14 @@ use salamandra_server::lib::db::exercises_db::validate_exercises;
 use salamandra_server::lib::db::workout_templates_db::{insert_workout_template, delete_workout_template};
 use salamandra_server::lib::db::wk_template_elements_db::insert_batch_wk_template_elements;
 use salamandra_server::lib::db::DBPool;
-use salamandra_server::lib::models::workout_templates_models::NewWorkoutTemplate;
+use salamandra_server::lib::models::workout_templates_models::{NewWorkoutTemplate, WkTemplateWithElements, WorkoutTemplate};
 use salamandra_server::lib::models::wk_template_elements_models::NewWkTemplateElement;
 use salamandra_server::lib::utils::handlers::{build_resp, extract_sub};
 use salamandra_server::lib::errors::DBError;
 
 
 #[derive(Serialize, Deserialize)]
-pub struct CreateWkTemplateRequest {
+struct CreateWkTemplateRequest {
     pub name: String,
     pub description: Option<String>,
     pub date_created: chrono::NaiveDate,
@@ -23,15 +23,16 @@ pub struct CreateWkTemplateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct WkTemplateElementRequest {
-    pub exercise_id: Uuid,
-    pub position: usize,
-    pub reps: usize,
-    pub sets: usize,
-    pub weight: usize,
-    pub rest: usize,
-    pub super_set: Option<usize>,
+struct WkTemplateElementRequest {
+    exercise_id: Uuid,
+    position: usize,
+    reps: usize,
+    sets: usize,
+    weight: usize,
+    rest: usize,
+    super_set: Option<usize>,
 }
+
 
 pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
 
@@ -81,7 +82,7 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
         date_created: req.date_created,
     };
     // Insert template
-    let new_workout_template = match insert_workout_template(&new_workout_template, test_db.clone()).await {
+    let new_workout_template: WorkoutTemplate = match insert_workout_template(&new_workout_template, test_db.clone()).await {
         Ok(template) => template,
         Err(DBError::UniqueViolation(mes)) => return Ok(build_resp(StatusCode::CONFLICT, mes)),
         Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
@@ -106,7 +107,13 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
 
     // Insert template elements
     match insert_batch_wk_template_elements(&new_template_elements, test_db.clone()).await {
-        Ok(_) => Ok(build_resp(StatusCode::CREATED, new_workout_template)),
+        Ok(elements) => {
+            let response = WkTemplateWithElements {
+                workout_template: new_workout_template,
+                elements,
+            };
+            Ok(build_resp(StatusCode::CREATED, response))
+        },
         Err(DBError::ConnectionError(_)) => Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
         Err(_) => {
             let _ = delete_workout_template(user_id, new_workout_template_id, test_db).await;
@@ -166,7 +173,6 @@ mod tests {
     use super::*;
     use serde_json::to_string;
     use lambda_http::http::header::{AUTHORIZATION, HeaderValue};
-    use salamandra_server::lib::models::workout_templates_models::WorkoutTemplate;
     use salamandra_server::lib::utils::tests::{insert_helper, pg_container, test_jwt, Items};
 
     async fn setup_template(db_pool: DBPool) -> (Uuid, CreateWkTemplateRequest) {
@@ -214,9 +220,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::CREATED);
 
         if let Body::Text(body) = response.into_body() {
-            let template: Result<WorkoutTemplate, _> = serde_json::from_str(&body);
+            let template: Result<WkTemplateWithElements, _> = serde_json::from_str(&body);
             assert!(template.is_ok()); 
-            assert_eq!(template.unwrap().name, "Placeholder".to_string());
+            assert_eq!(template.unwrap().workout_template.name, "Placeholder".to_string());
         }
 
     }
