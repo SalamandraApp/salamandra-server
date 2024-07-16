@@ -70,7 +70,7 @@ use crate::schema::exercises::dsl::{
 /// by performing an inner join between the `templateelements` and `exercises` tables.
 /// It returns a vector of `TemplateElementDetailed` structs containing detailed information
 /// about each template element.
-pub async fn select_wk_template_element_detailed_by_template(wk_template_id: Uuid, test_db: Option<DBPool>) -> Result<Vec<WkTemplateElementFull>, DBError> {
+pub async fn select_wk_template_element_by_template_full(wk_template_id: Uuid, test_db: Option<DBPool>) -> Result<Vec<WkTemplateElementFull>, DBError> {
     let pool = if test_db.is_none() {get_db_pool().await?} else {test_db.unwrap()};
     let mut conn = pool.get().await.map_err(|error| {
         DBError::ConnectionError(error.to_string())
@@ -96,6 +96,33 @@ pub async fn select_wk_template_element_detailed_by_template(wk_template_id: Uui
             exercise_type
         ))
         .load::<WkTemplateElementFull>(&mut conn)
+        .await
+        .map_err(|error| DBError::OperationError(error.to_string()))
+}
+
+/// Selects detailed template elements by workout template ID.
+///
+/// This function retrieves detailed template elements for a given workout template ID
+pub async fn select_wk_template_element_by_template(wk_template_id: Uuid, test_db: Option<DBPool>) -> Result<Vec<WkTemplateElement>, DBError> {
+    let pool = if test_db.is_none() {get_db_pool().await?} else {test_db.unwrap()};
+    let mut conn = pool.get().await.map_err(|error| {
+        DBError::ConnectionError(error.to_string())
+    })?;
+
+    wktemplateelements
+        .filter(workout_template_id.eq(wk_template_id))
+        .select((
+            id,
+            workout_template_id,
+            exercise_id,
+            position,
+            reps,
+            sets,
+            weight,
+            rest,
+            super_set,
+        ))
+        .load::<WkTemplateElement>(&mut conn)
         .await
         .map_err(|error| DBError::OperationError(error.to_string()))
 }
@@ -157,21 +184,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_select_wk_template_element_detailed_by_template_none() {
+    async fn test_select_wk_template_element_by_template_full_none() {
         let (db_pool, _container) = pg_container().await;
 
-        let read_res = select_wk_template_element_detailed_by_template(Uuid::new_v4(), Some(db_pool)).await;
+        let read_res = select_wk_template_element_by_template_full(Uuid::new_v4(), Some(db_pool)).await;
         assert!(read_res.is_ok());
         assert_eq!(read_res.unwrap().len(), 0);
     }
     
     #[tokio::test]
-    async fn test_select_wk_template_element_detailed_by_template_multiple() {
+    async fn test_select_wk_template_element_by_template_full_multiple() {
         let (db_pool, _container) = pg_container().await;
         let insert_res = insert_helper(4, Items::WkTemplateElements, db_pool.clone(), None).await;
         let new_workout_template_id = lookup_wk_template_element(insert_res[0], Some(db_pool.clone())).await.unwrap().workout_template_id;
 
-        let read_res = select_wk_template_element_detailed_by_template(new_workout_template_id, Some(db_pool)).await;
+        let read_res = select_wk_template_element_by_template_full(new_workout_template_id, Some(db_pool)).await;
         assert!(read_res.is_ok());
         let vector = read_res.clone().unwrap();
         assert_eq!(vector.len(), 4);
