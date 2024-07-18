@@ -39,7 +39,7 @@ impl Default for NewWorkoutTemplate {
     }
 }
 
-
+/// Workout template with all the elements that point to it
 #[derive(Serialize, Deserialize)]
 pub struct WkTemplateWithElements{
     #[serde(flatten)]
@@ -47,6 +47,8 @@ pub struct WkTemplateWithElements{
     pub elements: Vec<WkTemplateElement>
 }
 
+/// Workout template with all the elements that point to it
+/// Including the exercise info each element also points to
 #[derive(Serialize, Deserialize)]
 pub struct WorkoutTemplateFull {
     #[serde(flatten)]

@@ -22,13 +22,13 @@ struct CreateWkTemplateRequest {
     pub elements: Vec<WkTemplateElementRequest>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct WkTemplateElementRequest {
     exercise_id: Uuid,
     position: usize,
     reps: usize,
     sets: usize,
-    weight: usize,
+    weight: f32,
     rest: usize,
     super_set: Option<usize>,
 }
@@ -63,7 +63,7 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
     if chrono::Utc::now().date_naive() < req.date_created
         || n == 0 
         || !valid_position_super_set(&req.elements) {
-                return Ok(build_resp(StatusCode::BAD_REQUEST, ""));
+                return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid payload: see https://github.com/SalamandraApp/salamandra-server/wiki/Workout-templates-API#createwktemplaterequest for the correct format"));
     }
 
     let exercise_ids: HashSet<Uuid> = req.elements.iter().map(|element| element.exercise_id).collect();
@@ -98,7 +98,7 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
             position: req.elements[i].position as i32,
             reps: req.elements[i].reps as i32,
             sets: req.elements[i].sets as i32,
-            weight: req.elements[i].weight as i32,
+            weight: req.elements[i].weight as f32,
             rest: req.elements[i].rest as i32,
             super_set: req.elements[i].super_set.map(|s| s as i32),
         };
@@ -126,6 +126,11 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
 fn valid_position_super_set(items: &[WkTemplateElementRequest]) -> bool {
     if items.is_empty() {
         return true;
+    }
+   
+    // Sets and reps over 0
+    if items.iter().any(|item| item.sets == 0 || item.reps == 0) {
+        return false;
     }
 
     // Sequential position 
@@ -184,9 +189,9 @@ mod tests {
             elements.push(WkTemplateElementRequest {
                 exercise_id,
                 position,
-                reps: 0,
-                sets: 0,
-                weight: 0,
+                reps: 1,
+                sets: 1,
+                weight: 0.0,
                 super_set: None,
                 rest: 0,
             });

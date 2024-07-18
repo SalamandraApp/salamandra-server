@@ -18,7 +18,7 @@ pub struct WkTemplateElement {
     pub position: i32,
     pub reps: i32,
     pub sets: i32,
-    pub weight: i32,
+    pub weight: f32,
     pub rest: i32,
     pub super_set: Option<i32>,
 }
@@ -32,7 +32,7 @@ pub struct NewWkTemplateElement {
     pub position: i32,
     pub reps: i32,
     pub sets: i32,
-    pub weight: i32,
+    pub weight: f32,
     pub rest: i32,
     pub super_set: Option<i32>,
 }
@@ -44,7 +44,7 @@ impl Default for NewWkTemplateElement {
             position: 0, 
             reps: 0, 
             sets: 0, 
-            weight: 0, 
+            weight: 0.0, 
             rest: 0, 
             super_set: None,
         }
@@ -52,7 +52,7 @@ impl Default for NewWkTemplateElement {
 } 
 
 
-#[derive(Queryable, Identifiable, Associations, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Queryable, Identifiable, Associations, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[diesel(belongs_to(WorkoutTemplate))]
 #[diesel(belongs_to(Exercise))]
 #[diesel(table_name = wktemplateelements)]
@@ -62,7 +62,7 @@ pub struct WkTemplateElementFull{
     pub position: i32,
     pub reps: i32,
     pub sets: i32,
-    pub weight: i32,
+    pub weight: f32,
     pub rest: i32,
     pub super_set: Option<i32>,
     pub exercise_id: Uuid,

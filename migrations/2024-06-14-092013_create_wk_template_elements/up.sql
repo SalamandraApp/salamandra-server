@@ -6,7 +6,7 @@ CREATE TABLE WKTemplateElements (
     position INT NOT NULL,
     reps INT NOT NULL,
     sets INT NOT NULL,
-    weight INT NOT NULL,
+    weight FLOAT4 NOT NULL,
     rest INT NOT NULL,
     super_set INT
 );
