@@ -28,7 +28,7 @@ struct WkTemplateElementRequest {
     position: usize,
     reps: usize,
     sets: usize,
-    weight: f32,
+    weight: Option<f32>,
     rest: usize,
     super_set: Option<usize>,
 }
@@ -98,7 +98,7 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
             position: req.elements[i].position as i32,
             reps: req.elements[i].reps as i32,
             sets: req.elements[i].sets as i32,
-            weight: req.elements[i].weight as f32,
+            weight: req.elements[i].weight,
             rest: req.elements[i].rest as i32,
             super_set: req.elements[i].super_set.map(|s| s as i32),
         };
@@ -191,7 +191,7 @@ mod tests {
                 position,
                 reps: 1,
                 sets: 1,
-                weight: 0.0,
+                weight: Some(0.0),
                 super_set: None,
                 rest: 0,
             });

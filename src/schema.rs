@@ -35,7 +35,7 @@ diesel::table! {
         position -> Int4,
         reps -> Int4,
         sets -> Int4,
-        weight -> Float4,
+        weight -> Nullable<Float4>,
         rest -> Int4,
         super_set -> Nullable<Int4>,
     }
