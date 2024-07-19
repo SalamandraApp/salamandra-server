@@ -136,7 +136,7 @@ fn valid_position_super_set(items: &[WkTemplateElementRequest]) -> bool {
     // Sequential position 
     let mut positions: Vec<usize> = items.iter().map(|item| item.position).collect();
     positions.sort_unstable();
-    if positions != (0..items.len()).collect::<Vec<_>>() { 
+    if positions != (1..items.len() + 1).collect::<Vec<_>>() { 
         return false;
     }
 
@@ -149,7 +149,7 @@ fn valid_position_super_set(items: &[WkTemplateElementRequest]) -> bool {
     // Ensure super set values start at 0 and are sequential
     let mut super_set_values: Vec<usize> = super_set_map.keys().filter_map(|&k| k).collect();
     super_set_values.sort_unstable();
-    if super_set_values != (0..super_set_values.len()).collect::<Vec<_>>() {
+    if super_set_values != (1..super_set_values.len() + 1).collect::<Vec<_>>() {
         return false;
     }
 
@@ -185,7 +185,7 @@ mod tests {
         let exercise_id = insert_helper(1, Items::Exercises, db_pool, None).await[0];
 
         let mut elements = Vec::new();
-        for position in 0..4 {
+        for position in 1..5 {
             elements.push(WkTemplateElementRequest {
                 exercise_id,
                 position,
@@ -327,8 +327,8 @@ mod tests {
 
             payload2.elements[0].position = 1;
             payload2.elements[1].position = 2;
-            payload2.elements[2].position = 3;
-            payload2.elements[3].position = 4;
+            payload2.elements[2].position = 8;
+            payload2.elements[3].position = 3;
 
             payload3.elements[0].position = 0;
             payload3.elements[1].position = 1;
@@ -368,8 +368,8 @@ mod tests {
             // Not sequential super set id
             payload1.elements[0].super_set = Some(1);
             payload1.elements[1].super_set = Some(1);
-            payload1.elements[2].super_set = Some(2);
-            payload1.elements[3].super_set = Some(2);
+            payload1.elements[2].super_set = Some(3);
+            payload1.elements[3].super_set = Some(3);
 
             // Only 1 exercise in superset
             payload2.elements[0].super_set = Some(0);
