@@ -12,6 +12,7 @@ on:
 
 jobs: 
   e2e:
+    runs-on: ubuntu-latest
     container:
       image: ghcr.io/cargo-lambda/cargo-lambda:latest
     services:
