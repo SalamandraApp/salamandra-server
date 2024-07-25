@@ -1,5 +1,6 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
+use salamandra_server::lib::errors::DBError;
 use serde::{Deserialize, Serialize};
 
 use salamandra_server::lib::db::exercises_db::search_exercises;
@@ -16,14 +17,13 @@ pub async fn search_exercises_(event: Request, test_db: Option<DBPool>) -> Resul
 
     let name = match event.query_string_parameters().first("name") {
         Some(name) => name.to_string(),
-        None => return Ok(build_resp(StatusCode::BAD_REQUEST, ""))
+        None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Incorrect query parameters"))
     };
 
     let search_result = match search_exercises(&name, test_db).await {
         Ok(vec) => vec,
-        Err(_) => {
-            return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
-        }
+        Err(DBError::ConnectionError(ref mes)) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, mes)),
+        Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
     };
     let result = ExerciseSearchResult { exercises: search_result};
     Ok(build_resp(StatusCode::OK, result))
