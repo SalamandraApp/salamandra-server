@@ -32,9 +32,9 @@ jobs:
  
       - name: Install dependencies
         run: |
-          apt-get update
-          apt-get install -y python3 python3-pip postgresql-client
-          apt-get install -y python3-dotenv python3-psycopg2 python3-jwt
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip postgresql-client
+          sudo apt-get install -y python3-dotenv python3-psycopg2 python3-jwt
           
 
       - name: Run Migrations
