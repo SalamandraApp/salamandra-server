@@ -1,4 +1,4 @@
-name: Deployment
+name: End-to-End Tests
 
 on:
   workflow_run:
