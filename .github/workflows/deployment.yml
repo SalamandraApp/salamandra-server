@@ -15,6 +15,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Print workflow run information
+        run: |
+          echo "Workflow: ${{ github.event.workflow_run.workflow_id }}"
+          echo "Branch: ${{ github.event.workflow_run.head_branch }}"
+          echo "Conclusion: ${{ github.event.workflow_run.conclusion }}"
+
       - name: Determine branch
         id: determine_branch
         run: echo "branch=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_ENV
@@ -23,8 +29,10 @@ jobs:
         run: |
           if [ "${{ env.branch }}" == "main" ]; then
             echo "Deploying to production environment..."
+            # Add your production deployment commands here
           elif [ "${{ env.branch }}" == "develop" ]; then
             echo "Deploying to staging environment..."
+            # Add your staging deployment commands here
           else
             echo "Branch is neither 'main' nor 'develop'. No deployment will be done."
 
