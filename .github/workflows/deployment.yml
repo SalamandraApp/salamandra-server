@@ -1,0 +1,30 @@
+name: Deployment
+
+on:
+  workflow_run:
+    workflows: ["End-to-End Tests"]
+    types:
+      - completed
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Determine branch
+        id: determine_branch
+        run: echo "branch=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_ENV
+
+      - name: Deploy to environment
+        run: |
+          if [ "${{ env.branch }}" == "main" ]; then
+            echo "Deploying to production environment..."
+          elif [ "${{ env.branch }}" == "develop" ]; then
+            echo "Deploying to staging environment..."
+          else
+            echo "Branch is neither 'main' nor 'develop'. No deployment will be done."
+
