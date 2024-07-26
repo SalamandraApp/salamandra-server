@@ -59,11 +59,13 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
     // - Date
     // - Number of elements
     // - Position and super set
+    let (valid, message) = valid_position_super_set(&req.elements);
     let n = req.elements.len();
     if chrono::Utc::now().date_naive() < req.date_created
         || n == 0 
-        || !valid_position_super_set(&req.elements) {
-                return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid payload: see https://github.com/SalamandraApp/salamandra-server/wiki/Workout-templates-API#createwktemplaterequest for the correct format"));
+        || !valid {
+            let bad_request_message = format!("Invalid payload: {}. See https://github.com/SalamandraApp/salamandra-server/wiki/Workout-templates-API#createwktemplaterequest for the correct format", message);
+            return Ok(build_resp(StatusCode::BAD_REQUEST, bad_request_message));
     }
 
     let exercise_ids: HashSet<Uuid> = req.elements.iter().map(|element| element.exercise_id).collect();
@@ -123,21 +125,21 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
 }
 
 
-fn valid_position_super_set(items: &[WkTemplateElementRequest]) -> bool {
+fn valid_position_super_set(items: &[WkTemplateElementRequest]) -> (bool, String) {
     if items.is_empty() {
-        return true;
+        return (false, "There must be at least one element in the workout template".to_string());
     }
    
     // Sets and reps over 0
     if items.iter().any(|item| item.sets == 0 || item.reps == 0) {
-        return false;
+        return (false, "All sets and reps values must be at least 1".to_string());
     }
 
     // Sequential position 
     let mut positions: Vec<usize> = items.iter().map(|item| item.position).collect();
     positions.sort_unstable();
     if positions != (1..items.len() + 1).collect::<Vec<_>>() { 
-        return false;
+        return (false, "The element's positions must be sequential, starting from 1".to_string());
     }
 
     // Group by superset
@@ -146,11 +148,11 @@ fn valid_position_super_set(items: &[WkTemplateElementRequest]) -> bool {
         super_set_map.entry(item.super_set).or_insert_with(Vec::new).push(item);
     }
 
-    // Ensure super set values start at 0 and are sequential
+    // Ensure super set values start at 1 and are sequential
     let mut super_set_values: Vec<usize> = super_set_map.keys().filter_map(|&k| k).collect();
     super_set_values.sort_unstable();
     if super_set_values != (1..super_set_values.len() + 1).collect::<Vec<_>>() {
-        return false;
+        return (false, "The element's non-null super_set must be sequential, starting from 1".to_string());
     }
 
     // Super set group
@@ -158,19 +160,19 @@ fn valid_position_super_set(items: &[WkTemplateElementRequest]) -> bool {
         if let Some(_) = super_set {
             // At least 2 exercises
             if group.len() < 2 {
-                return false;
+                return (false, "There must be at least 2 elements per super_set group".to_string());
             }
 
             // Sequential positions within superset
             let mut ss_positions: Vec<usize> = group.iter().map(|item| item.position).collect();
             ss_positions.sort_unstable();
             if ss_positions != (ss_positions[0]..ss_positions[0] + group.len()).collect::<Vec<_>>() {
-                return false;
+                return (false, "In each super_set group all position values must be sequential".to_string());
             }
         }
     }
 
-    true
+    (true, "".to_string())
 }
 
 #[cfg(test)]

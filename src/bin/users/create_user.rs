@@ -151,7 +151,7 @@ mod tests {
             username: "username".to_string(),
             date_joined: Utc::now().naive_utc().date(),
         };
-
+        println!("DATE: {}", Utc::now().naive_utc().date());
         let mut req = Request::default();
         let jwt = test_jwt(user_id);
         req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
