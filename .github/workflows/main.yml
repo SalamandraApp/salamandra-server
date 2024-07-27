@@ -84,16 +84,18 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Print branch name
-        run: echo "Current branch is ${{ github.ref_name }}"
+        run: echo "Current branch is ${{ github.head_ref || github.ref_name }}"
 
       - name: Deploy to environment
         run: |
-          if [ "${{ github.ref_name }}" == "main" ]; then
+          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
+          if [ "$BRANCH_NAME" == "main" ]; then
             echo "Deploying to production environment..."
             # Add your production deployment commands here
-          elif [ "${{ github.ref_name }}" == "develop" ]; then
+          elif [ "$BRANCH_NAME" == "develop" ]; then
             echo "Deploying to staging environment..."
             # Add your staging deployment commands here
           else
-            echo "Branch is neither 'main' nor 'develop'. No deployment will be done."
-          fine."
+            echo "Branch is $BRANCH_NAME. Deploying to development environment..."
+            # Add your development deployment commands here
+          fi
