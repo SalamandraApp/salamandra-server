@@ -77,35 +77,12 @@ jobs:
           python3 tests/init.py
 
   # ---------------------------------------------------------------------------------
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Develop
-        if: ${{ github.base_ref == 'develop' }}
-        run: |
-          cargo build --release
-          cargo deploy 
-
-      - name: Develop
-        run: |
-          if [ "${{ github.base_ref }}" == "main" ]; then
-            echo "This is a pull request to main. Deploying to production environment..."
-            # Add your production deployment commands here
-          elif [ "${{ github.base_ref }}" == "develop" ]; then
-            echo "This is a pull request to develop. Deploying to staging environment..."
-            # Add your staging deployment commands here
-          else
-            echo "This pull request is targeting neither main nor develop. No deployment will be done."
-          fi
 
   deploy:
     needs: e2e
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/cargo-lambda/cargo-lambda:lates
+      image: ghcr.io/cargo-lambda/cargo-lambda:latest
     steps:
       - uses: actions/checkout@v3
 
@@ -115,7 +92,7 @@ jobs:
           cargo lambda build --release
           cargo lambda deploy --binary-name exercises         Exercises-dev
           cargo lambda deploy --binary-name users             Users-dev
-          cargo lambda deploy --binary-name workout-templates WorkoutTemplates-dev
+          cargo lambda deploy --binary-name workout_templates WorkoutTemplates-dev
         env:
           AWS_DEFAULT_REGION: eu-west-3
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
