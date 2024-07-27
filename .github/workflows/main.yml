@@ -92,7 +92,7 @@ jobs:
           cargo lambda build --release
           cargo lambda deploy --binary-name exercises         Exercises-dev
           cargo lambda deploy --binary-name users             Users-dev
-          cargo lambda deploy --binary-name workout-templates WorkoutTemplates-dev
+          cargo lambda deploy --binary-name workout_templates WorkoutTemplates-dev
         env:
           AWS_DEFAULT_REGION: eu-west-3
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
