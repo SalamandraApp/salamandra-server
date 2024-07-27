@@ -83,19 +83,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Print branch name
-        run: echo "Current branch is ${{ github.head_ref || github.ref_name }}"
+      - name: Print branch information
+        run: |
+          echo "Source branch: ${{ github.head_ref }}"
+          echo "Target branch: ${{ github.base_ref }}"
 
       - name: Deploy to environment
         run: |
-          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
-          if [ "$BRANCH_NAME" == "main" ]; then
-            echo "Deploying to production environment..."
+          if [ "${{ github.base_ref }}" == "main" ]; then
+            echo "This is a pull request to main. Deploying to production environment..."
             # Add your production deployment commands here
-          elif [ "$BRANCH_NAME" == "develop" ]; then
-            echo "Deploying to staging environment..."
+          elif [ "${{ github.base_ref }}" == "develop" ]; then
+            echo "This is a pull request to develop. Deploying to staging environment..."
             # Add your staging deployment commands here
           else
-            echo "Branch is $BRANCH_NAME. Deploying to development environment..."
-            # Add your development deployment commands here
+            echo "This pull request is targeting neither main nor develop. No deployment will be done."
           fi
