@@ -82,7 +82,7 @@ jobs:
     needs: e2e
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/cargo-lambda/cargo-lambda:lates
+      image: ghcr.io/cargo-lambda/cargo-lambda:latest
     steps:
       - uses: actions/checkout@v3
 
