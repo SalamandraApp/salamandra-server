@@ -1,0 +1,101 @@
+name: Main Workflow
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+  unittests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            build-essential \
+            libpq-dev
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Install Diesel CLI
+        run: cargo install diesel_cli --no-default-features --features postgres
+
+      - name: Build and test
+        run: RUST_BACKTRACE=full cargo test
+
+  # ---------------------------------------------------------------------------------
+  e2e:
+    needs: unittests
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/cargo-lambda/cargo-lambda:latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      
+ 
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y python3 python3-pip postgresql-client
+          apt-get install -y python3-dotenv python3-psycopg2 python3-jwt
+          
+
+      - name: Run Migrations
+        run: |
+          (find migrations -type f -name "up.sql" ! -path "*/00000000000000_diesel_initial_setup/*" | sort | xargs cat; cat tests/sample_data.sql) > ./all_up.sql
+          PGPASSWORD=postgres psql -h postgres -U postgres -f all_up.sql
+      
+      - name: Start and Run Tests
+        env: 
+          DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
+        run: |
+          cargo lambda watch -a 0.0.0.0 &
+          sleep 5
+          python3 tests/init.py
+
+  # ---------------------------------------------------------------------------------
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Print branch information
+        run: |
+          echo "Source branch: ${{ github.head_ref }}"
+          echo "Target branch: ${{ github.base_ref }}"
+
+      - name: Deploy to environment
+        run: |
+          if [ "${{ github.base_ref }}" == "main" ]; then
+            echo "This is a pull request to main. Deploying to production environment..."
+            # Add your production deployment commands here
+          elif [ "${{ github.base_ref }}" == "develop" ]; then
+            echo "This is a pull request to develop. Deploying to staging environment..."
+            # Add your staging deployment commands here
+          else
+            echo "This pull request is targeting neither main nor develop. No deployment will be done."
+          fi
