@@ -1,5 +1,6 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
+use tracing::error;
 use uuid::Uuid;
 
 use salamandra_server::lib::db::exercises_db::lookup_exercise;
@@ -13,11 +14,14 @@ pub async fn get_exercise(event: Request, test_db: Option<DBPool>) -> Result<Res
         Some(id) => id,
         None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid or missing exercise_id")),
     };
-
+ 
     match lookup_exercise(exercise_id, test_db).await {
         Ok(exercise) => Ok(build_resp(StatusCode::OK, exercise)),
         Err(DBError::ItemNotFound(mes)) => Ok(build_resp(StatusCode::NOT_FOUND, mes)),
-        Err(_) => Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+        Err(mes) => {
+            error!("500: {}", mes);
+            Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     }
 }
 

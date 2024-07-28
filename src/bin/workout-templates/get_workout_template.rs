@@ -1,6 +1,7 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
 use salamandra_server::lib::models::workout_templates_models::{WkTemplateWithElements, WorkoutTemplate, WorkoutTemplateFull};
+use tracing::error;
 use uuid::Uuid;
 
 use salamandra_server::lib::db::workout_templates_db::lookup_workout_template;
@@ -40,13 +41,19 @@ pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Re
             template
         }
         Err(DBError::ItemNotFound(mes)) => return Ok(build_resp(StatusCode::NOT_FOUND, mes)),
-        Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+        Err(mes) => {
+            error!("500: {}", mes);
+            return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     };
     match full {
         true => {
         let full_elements = match select_wk_template_element_by_template_full(template_id, test_db).await {
             Ok(vector) => vector,
-            Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+            Err(mes) => {
+                error!("500: {}", mes);
+                return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+            }
         };
 
         // Create models 
@@ -65,7 +72,10 @@ pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Re
         false => {
             let elements = match select_wk_template_element_by_template(template_id, test_db).await {
                 Ok(vector) => vector,
-                Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+                Err(mes) => {
+                    error!("500: {}", mes);
+                    return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+                }
             };
 
             // Create models 

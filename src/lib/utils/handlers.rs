@@ -12,7 +12,7 @@ where
         Ok(json) => Body::from(json),
         Err(_) => Body::from("Failed to serialize response"),
     };
-
+    
     Response::builder()
         .status(status)
         .header("Content-Type", "application/json")

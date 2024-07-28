@@ -1,5 +1,6 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt,};
 use lambda_http::http::StatusCode;
+use tracing::error;
 use uuid::Uuid;
 
 use salamandra_server::lib::db::users_db::lookup_user;
@@ -18,7 +19,10 @@ pub async fn get_user(event: Request, test_db: Option<DBPool>) -> Result<Respons
     match lookup_user(user_id, test_db).await {
         Ok(user) => Ok(build_resp(StatusCode::OK, user)),
         Err(DBError::ItemNotFound(mes)) => Ok(build_resp(StatusCode::NOT_FOUND, mes)),
-        Err(_) => Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+        Err(mes) => {
+            error!("500: {}", mes);
+            Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     }
 }
 

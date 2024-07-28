@@ -1,6 +1,7 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use uuid::Uuid;
 
 use salamandra_server::lib::db::workout_templates_db::select_workout_template_by_user;
@@ -34,7 +35,10 @@ pub async fn get_all_workout_templates(event: Request, test_db: Option<DBPool>) 
             Ok(build_resp(StatusCode::OK, response))
 
         },
-        Err(_) => Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        Err(mes) => {
+            error!("500: {}", mes);
+            Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     }
 }
 

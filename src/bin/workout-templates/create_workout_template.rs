@@ -1,6 +1,7 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use uuid::Uuid;
 use std::collections::{HashMap, HashSet};
 
@@ -75,7 +76,10 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
                 return Ok(build_resp(StatusCode::NOT_FOUND, "One or more exercise IDs do not reference existing exercises"));
             }
         }
-        Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+        Err(mes) => {
+            error!("500: {}", mes);
+            return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     }
     let new_workout_template = NewWorkoutTemplate {
         user_id: user_id.clone(),
@@ -87,7 +91,10 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
     let new_workout_template: WorkoutTemplate = match insert_workout_template(&new_workout_template, test_db.clone()).await {
         Ok(template) => template,
         Err(DBError::UniqueViolation(mes)) => return Ok(build_resp(StatusCode::CONFLICT, mes)),
-        Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+        Err(mes) => {
+            error!("500: {}", mes);
+            return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     };
 
     let new_workout_template_id = new_workout_template.id;

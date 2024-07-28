@@ -7,6 +7,7 @@ use salamandra_server::lib::db::exercises_db::search_exercises;
 use salamandra_server::lib::utils::handlers::build_resp;
 use salamandra_server::lib::db::DBPool;
 use salamandra_server::lib::models::exercise_models::Exercise;
+use tracing::error;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ExerciseSearchResult {
@@ -23,7 +24,10 @@ pub async fn search_exercises_(event: Request, test_db: Option<DBPool>) -> Resul
     let search_result = match search_exercises(&name, test_db).await {
         Ok(vec) => vec,
         Err(DBError::ConnectionError(ref mes)) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, mes)),
-        Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+        Err(mes) => {
+            error!("500: {}", mes);
+            return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     };
     let result = ExerciseSearchResult { exercises: search_result};
     Ok(build_resp(StatusCode::OK, result))
