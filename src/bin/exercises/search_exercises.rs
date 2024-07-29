@@ -23,9 +23,8 @@ pub async fn search_exercises_(event: Request, test_db: Option<DBPool>) -> Resul
 
     let search_result = match search_exercises(&name, test_db).await {
         Ok(vec) => vec,
-        Err(DBError::ConnectionError(ref mes)) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, mes)),
-        Err(mes) => {
-            error!("500: {}", mes);
+        Err(error) => {
+            error!("INTERNAL SERVER ERROR: {}", error);
             return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     };

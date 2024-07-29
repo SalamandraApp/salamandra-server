@@ -18,8 +18,8 @@ pub async fn get_exercise(event: Request, test_db: Option<DBPool>) -> Result<Res
     match lookup_exercise(exercise_id, test_db).await {
         Ok(exercise) => Ok(build_resp(StatusCode::OK, exercise)),
         Err(DBError::ItemNotFound(mes)) => Ok(build_resp(StatusCode::NOT_FOUND, mes)),
-        Err(mes) => {
-            error!("500: {}", mes);
+        Err(other_error) => {
+            error!("INTERNAL SERVER ERROR: {}", other_error);
             Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     }

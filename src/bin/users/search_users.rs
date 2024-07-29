@@ -29,8 +29,8 @@ pub async fn search_users(event: Request, test_db: Option<DBPool>) -> Result<Res
 
     let search_result = match search_username(&username, test_db).await {
         Ok(vec) => vec,
-        Err(mes) => {
-            error!("500: {}", mes);
+        Err(error) => {
+            error!("INTERNAL SERVER ERROR: {}", error);
             return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     };

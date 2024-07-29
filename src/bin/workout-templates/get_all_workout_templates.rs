@@ -36,7 +36,7 @@ pub async fn get_all_workout_templates(event: Request, test_db: Option<DBPool>) 
 
         },
         Err(mes) => {
-            error!("500: {}", mes);
+            error!("INTERNAL SERVER ERROR: {}", mes);
             Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     }

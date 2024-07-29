@@ -42,7 +42,7 @@ pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Re
         }
         Err(DBError::ItemNotFound(mes)) => return Ok(build_resp(StatusCode::NOT_FOUND, mes)),
         Err(mes) => {
-            error!("500: {}", mes);
+            error!("INTERNAL SERVER ERROR: {}", mes);
             return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     };
@@ -51,7 +51,7 @@ pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Re
         let full_elements = match select_wk_template_element_by_template_full(template_id, test_db).await {
             Ok(vector) => vector,
             Err(mes) => {
-                error!("500: {}", mes);
+                error!("INTERNAL SERVER ERROR: {}", mes);
                 return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
             }
         };
@@ -73,7 +73,7 @@ pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Re
             let elements = match select_wk_template_element_by_template(template_id, test_db).await {
                 Ok(vector) => vector,
                 Err(mes) => {
-                    error!("500: {}", mes);
+                    error!("INTERNAL SERVER ERROR: {}", mes);
                     return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
                 }
             };

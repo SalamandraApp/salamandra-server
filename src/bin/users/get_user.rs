@@ -19,8 +19,8 @@ pub async fn get_user(event: Request, test_db: Option<DBPool>) -> Result<Respons
     match lookup_user(user_id, test_db).await {
         Ok(user) => Ok(build_resp(StatusCode::OK, user)),
         Err(DBError::ItemNotFound(mes)) => Ok(build_resp(StatusCode::NOT_FOUND, mes)),
-        Err(mes) => {
-            error!("500: {}", mes);
+        Err(error) => {
+            error!("INTERNAL SERVER ERROR: {}", error);
             Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     }

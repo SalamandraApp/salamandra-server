@@ -34,7 +34,7 @@ pub async fn delete_workout_template_(event: Request, test_db: Option<DBPool>) -
             Ok(build_resp(StatusCode::NOT_FOUND, ""))
         }
         Err(mes) => {
-            error!("500: {}", mes);
+            error!("INTERNAL SERVER ERROR: {}", mes);
             Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     }
