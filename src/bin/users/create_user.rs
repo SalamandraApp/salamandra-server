@@ -1,6 +1,7 @@
 use lambda_http::{Error, Request, Response, Body};
 use lambda_http::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use tracing::{error, warn};
 use uuid::Uuid;
 use chrono::NaiveDate;
 
@@ -33,8 +34,14 @@ pub async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Resp
             };
             let resp = match insert_user(&new_user, test_db).await {
                 Ok(user) => build_resp(StatusCode::CREATED, user),
-                Err(DBError::UniqueViolation(mes)) => build_resp(StatusCode::CONFLICT, mes),
-                Err(_) => build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""),
+                Err(DBError::UniqueViolation(mes)) => {
+                    warn!("Tried to insert already exisiting user");
+                    build_resp(StatusCode::CONFLICT, mes)
+                },
+                Err(error) => {
+                    error!("INTERNAL SERVER ERROR: {}", error);
+                    build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")
+                }
             };
             return Ok(resp);
         }

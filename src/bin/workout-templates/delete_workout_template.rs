@@ -1,5 +1,6 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
+use tracing::error;
 use uuid::Uuid;
 
 use salamandra_server::lib::db::workout_templates_db::delete_workout_template;
@@ -32,7 +33,10 @@ pub async fn delete_workout_template_(event: Request, test_db: Option<DBPool>) -
             }
             Ok(build_resp(StatusCode::NOT_FOUND, ""))
         }
-        Err(_) => Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        Err(mes) => {
+            error!("INTERNAL SERVER ERROR: {}", mes);
+            Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     }
 }
 

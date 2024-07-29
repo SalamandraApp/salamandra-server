@@ -1,6 +1,7 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use uuid::Uuid;
 
 use salamandra_server::lib::db::users_db::search_username;
@@ -28,7 +29,8 @@ pub async fn search_users(event: Request, test_db: Option<DBPool>) -> Result<Res
 
     let search_result = match search_username(&username, test_db).await {
         Ok(vec) => vec,
-        Err(_) => {
+        Err(error) => {
+            error!("INTERNAL SERVER ERROR: {}", error);
             return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     };

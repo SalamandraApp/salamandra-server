@@ -12,7 +12,7 @@ where
         Ok(json) => Body::from(json),
         Err(_) => Body::from("Failed to serialize response"),
     };
-
+    
     Response::builder()
         .status(status)
         .header("Content-Type", "application/json")
@@ -27,6 +27,7 @@ struct Claims {
 
 
 pub fn extract_sub(headers: &HeaderMap, url_user_id: Option<Uuid>) -> Result<Uuid, Response<Body>> {
+
     let auth_header = headers.get("Authorization").ok_or_else(|| build_resp(StatusCode::UNAUTHORIZED, "Missing Authorization header"))?;
     let token = auth_header.to_str().map_err(|_| build_resp(StatusCode::UNAUTHORIZED, "Invalid header value"))?.strip_prefix("Bearer ").ok_or_else(|| build_resp(StatusCode::UNAUTHORIZED, "Invalid Authorization header format"))?;
 
@@ -39,6 +40,7 @@ pub fn extract_sub(headers: &HeaderMap, url_user_id: Option<Uuid>) -> Result<Uui
     let claims: Claims = serde_json::from_slice(&payload).map_err(|e| build_resp(StatusCode::UNAUTHORIZED, &e.to_string()))?;
     let extracted_id = Uuid::parse_str(&claims.sub).map_err(|_| build_resp(StatusCode::UNAUTHORIZED, "Invalid UUID in token"))?;
 
+    // This is the only code that should trigger
     if let Some(url_id) = url_user_id {
         if extracted_id != url_id {
             return Err(build_resp(StatusCode::FORBIDDEN, "Forbidden"));

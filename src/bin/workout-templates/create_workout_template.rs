@@ -1,6 +1,7 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use tracing::{error, warn};
 use uuid::Uuid;
 use std::collections::{HashMap, HashSet};
 
@@ -75,7 +76,10 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
                 return Ok(build_resp(StatusCode::NOT_FOUND, "One or more exercise IDs do not reference existing exercises"));
             }
         }
-        Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+        Err(error) => {
+            error!("INTERNAL SERVER ERROR: {}", error);
+            return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     }
     let new_workout_template = NewWorkoutTemplate {
         user_id: user_id.clone(),
@@ -86,8 +90,15 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
     // Insert template
     let new_workout_template: WorkoutTemplate = match insert_workout_template(&new_workout_template, test_db.clone()).await {
         Ok(template) => template,
-        Err(DBError::UniqueViolation(mes)) => return Ok(build_resp(StatusCode::CONFLICT, mes)),
-        Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+        Err(DBError::UniqueViolation(mes)) => {
+            // should never trigger since the primary key is only the UUID
+            warn!("Tried to insert already exisiting workout-template");
+            return Ok(build_resp(StatusCode::CONFLICT, mes))
+        }
+        Err(mes) => {
+            error!("INTERNAL SERVER ERROR: {}", mes);
+            return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     };
 
     let new_workout_template_id = new_workout_template.id;
@@ -116,9 +127,17 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
             };
             Ok(build_resp(StatusCode::CREATED, response))
         },
-        Err(DBError::ConnectionError(_)) => Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
-        Err(_) => {
-            let _ = delete_workout_template(user_id, new_workout_template_id, test_db).await;
+        Err(DBError::ConnectionError(mes)) => {
+            error!("INTERNAL SERVER ERROR: {}", mes);
+            Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
+        Err(error) => {
+            // Should never trigger because all values are checked before hand
+            warn!("Could not insert workout-template element: {}", error);
+            let result_delete = delete_workout_template(user_id, new_workout_template_id, test_db).await;
+            if result_delete.is_err() {
+                warn!("Could not delete workout-template triggered by error inserting templates");
+            }
             Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     }
