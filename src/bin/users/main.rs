@@ -5,6 +5,7 @@ mod search_users;
 use get_user::get_user;
 use create_user::create_user;
 use search_users::search_users;
+use salamandra_server::lib::db::DBConnector;
 
 use lambda_http::{run, service_fn, Error, Request, Response, Body, tracing};
 use lambda_http::http::Method;
@@ -19,10 +20,11 @@ async fn main() -> Result<(), Error> {
 
 async fn router(event: Request) -> Result<Response<Body>, Error> {
     let path = event.uri().path();
+    let connector = DBConnector::default();
     let response = match (event.method(), path) {
-        (&Method::GET, _) if Regex::new(r"^/users/[a-fA-F0-9-]+$").unwrap().is_match(path) => get_user(event, None).await,
-        (&Method::POST, "/users") => create_user(event, None).await,
-        (&Method::GET, "/users") => search_users(event, None).await,
+        (&Method::GET, _) if Regex::new(r"^/users/[a-fA-F0-9-]+$").unwrap().is_match(path) => get_user(event, &connector).await,
+        (&Method::POST, "/users") => create_user(event, &connector).await,
+        (&Method::GET, "/users") => search_users(event, &connector).await,
         _ => {
             println!("Unmatched route: Method: {}, URI: {}", event.method(), event.uri().path());
             Ok(Response::builder()

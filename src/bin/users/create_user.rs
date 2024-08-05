@@ -7,7 +7,7 @@ use chrono::NaiveDate;
 
 use salamandra_server::lib::models::user_models::User;
 use salamandra_server::lib::db::users_db::insert_user;
-use salamandra_server::lib::db::DBPool;
+use salamandra_server::lib::db::DBConnector;
 use salamandra_server::lib::errors::DBError;
 use salamandra_server::lib::utils::handlers::{build_resp, extract_sub};
 
@@ -18,7 +18,7 @@ struct CreateUserRequest {
     date_joined: NaiveDate,
 }
 
-pub async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
+pub async fn create_user(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
     if let Body::Text(body) = event.clone().into_body() {
         if let Ok(req) = serde_json::from_str::<CreateUserRequest>(&body) {
@@ -32,7 +32,7 @@ pub async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Resp
                 date_joined: req.date_joined,
                 ..Default::default()
             };
-            let resp = match insert_user(&new_user, test_db).await {
+            let resp = match insert_user(&new_user, connector).await {
                 Ok(user) => build_resp(StatusCode::CREATED, user),
                 Err(DBError::UniqueViolation(mes)) => {
                     warn!("Tried to insert already exisiting user");
@@ -75,7 +75,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_invalid_payload() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let user_id = Uuid::new_v4();
 
         {   // ------ Different fields
@@ -86,7 +86,7 @@ mod tests {
             req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
             *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
 
-            let resp = create_user(req, Some(pool.clone())).await;
+            let resp = create_user(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -104,7 +104,7 @@ mod tests {
             req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
             *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
 
-            let resp = create_user(req, Some(pool.clone())).await;
+            let resp = create_user(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -115,7 +115,7 @@ mod tests {
             let mut req = Request::default();
             let jwt = test_jwt(user_id);
             req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
-            let resp = create_user(req, Some(pool)).await;
+            let resp = create_user(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -124,7 +124,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_create_user_existing() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let user_id = Uuid::new_v4();
         let payload = CreateUserRequest {
             uuid: user_id,
@@ -137,12 +137,12 @@ mod tests {
         req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
         *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
         
-        let resp = create_user(req.clone(), Some(pool.clone())).await;
+        let resp = create_user(req.clone(), &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::CREATED);
 
-        let resp = create_user(req, Some(pool)).await;
+        let resp = create_user(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::CONFLICT);
@@ -151,7 +151,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_create_user_new() {        
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let user_id = Uuid::new_v4();
         let payload = CreateUserRequest {
             uuid: user_id,
@@ -164,7 +164,7 @@ mod tests {
         req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
         *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
         
-        let resp = create_user(req, Some(pool)).await;
+        let resp = create_user(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::CREATED);
