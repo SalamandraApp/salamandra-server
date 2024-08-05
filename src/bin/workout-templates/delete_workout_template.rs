@@ -5,10 +5,10 @@ use uuid::Uuid;
 
 use salamandra_server::lib::db::workout_templates_db::delete_workout_template;
 use salamandra_server::lib::utils::handlers::{build_resp, extract_sub};
-use salamandra_server::lib::db::DBPool;
+use salamandra_server::lib::db::DBConnector;
 
 
-pub async fn delete_workout_template_(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
+pub async fn delete_workout_template_(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
     let user_id = match event.path_parameters().first("user_id").and_then(|s| Uuid::parse_str(s).ok()) {
         Some(id) => id,
@@ -26,7 +26,7 @@ pub async fn delete_workout_template_(event: Request, test_db: Option<DBPool>) -
     };
 
 
-    match delete_workout_template(user_id, workout_template_id, test_db).await {
+    match delete_workout_template(user_id, workout_template_id, connector).await {
         Ok(deleted) => {
             if deleted > 0 {
                 return Ok(build_resp(StatusCode::NO_CONTENT, ""));
@@ -51,7 +51,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_workout_template_invalid_ids() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
 
         { // ------ Invalid uuid format
             let user_id = Uuid::new_v4();
@@ -64,7 +64,7 @@ mod tests {
             let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id_string), ("workout_template_id".into(), workout_template_id_string)]));
 
 
-            let resp = delete_workout_template_(req, Some(pool.clone())).await;
+            let resp = delete_workout_template_(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -80,7 +80,7 @@ mod tests {
             let req = req.with_path_parameters(
                 HashMap::from([("user_id".to_string(), user_id_string)])
             );
-            let resp = delete_workout_template_(req, Some(pool.clone())).await;
+            let resp = delete_workout_template_(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -90,9 +90,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_workout_template_none() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
 
-        let user_id = insert_helper(1, Items::Users, pool.clone(), None).await[0];
+        let user_id = insert_helper(1, Items::Users, &connector, None).await[0];
         let user_id_string = user_id.to_string();
         let workout_template_id = Uuid::new_v4();
         let workout_template_id_string = workout_template_id.to_string();
@@ -103,7 +103,7 @@ mod tests {
         let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id_string), ("workout_template_id".into(), workout_template_id_string)]));
 
 
-        let resp = delete_workout_template_(req, Some(pool.clone())).await;
+        let resp = delete_workout_template_(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -111,9 +111,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_workout_template_success() {
-        let (pool, _container) = pg_container().await;
-        let workout_template_id = insert_helper(1, Items::WkTemplates, pool.clone(), None).await[0];
-        let user_id = lookup_workout_template(workout_template_id, Some(pool.clone())).await.unwrap().user_id;
+        let (connector, _container) = pg_container().await;
+        let workout_template_id = insert_helper(1, Items::WkTemplates, &connector, None).await[0];
+        let user_id = lookup_workout_template(workout_template_id, &connector).await.unwrap().user_id;
         let user_id_string = user_id.to_string();
         let workout_template_id_string = workout_template_id.to_string();
         let mut req = Request::default();
@@ -123,7 +123,7 @@ mod tests {
         let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id_string), ("workout_template_id".into(), workout_template_id_string)]));
 
 
-        let resp = delete_workout_template_(req, Some(pool.clone())).await;
+        let resp = delete_workout_template_(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::NO_CONTENT);

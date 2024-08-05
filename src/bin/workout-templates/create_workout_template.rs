@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use salamandra_server::lib::db::exercises_db::validate_exercises;
 use salamandra_server::lib::db::workout_templates_db::{insert_workout_template, delete_workout_template};
 use salamandra_server::lib::db::wk_template_elements_db::insert_batch_wk_template_elements;
-use salamandra_server::lib::db::DBPool;
+use salamandra_server::lib::db::DBConnector;
 use salamandra_server::lib::models::workout_templates_models::{NewWorkoutTemplate, WkTemplateWithElements, WorkoutTemplate};
 use salamandra_server::lib::models::wk_template_elements_models::NewWkTemplateElement;
 use salamandra_server::lib::utils::handlers::{build_resp, extract_sub};
@@ -35,7 +35,7 @@ struct WkTemplateElementRequest {
 }
 
 
-pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
+pub async fn create_workout_template(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
     let user_id = match event.path_parameters().first("user_id").and_then(|s| Uuid::parse_str(s).ok()) {
         Some(id) => id,
@@ -70,7 +70,7 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
     }
 
     let exercise_ids: HashSet<Uuid> = req.elements.iter().map(|element| element.exercise_id).collect();
-    match validate_exercises(exercise_ids.into_iter().collect(), test_db.clone()).await {
+    match validate_exercises(exercise_ids.into_iter().collect(), connector).await {
         Ok(valid) => {
             if !valid {
                 return Ok(build_resp(StatusCode::NOT_FOUND, "One or more exercise IDs do not reference existing exercises"));
@@ -88,7 +88,7 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
         date_created: req.date_created,
     };
     // Insert template
-    let new_workout_template: WorkoutTemplate = match insert_workout_template(&new_workout_template, test_db.clone()).await {
+    let new_workout_template: WorkoutTemplate = match insert_workout_template(&new_workout_template, connector).await {
         Ok(template) => template,
         Err(DBError::UniqueViolation(mes)) => {
             // should never trigger since the primary key is only the UUID
@@ -119,7 +119,7 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
     }
 
     // Insert template elements
-    match insert_batch_wk_template_elements(&new_template_elements, test_db.clone()).await {
+    match insert_batch_wk_template_elements(&new_template_elements, connector).await {
         Ok(elements) => {
             let response = WkTemplateWithElements {
                 workout_template: new_workout_template,
@@ -134,7 +134,7 @@ pub async fn create_workout_template(event: Request, test_db: Option<DBPool>) ->
         Err(error) => {
             // Should never trigger because all values are checked before hand
             warn!("Could not insert workout-template element: {}", error);
-            let result_delete = delete_workout_template(user_id, new_workout_template_id, test_db).await;
+            let result_delete = delete_workout_template(user_id, new_workout_template_id, connector).await;
             if result_delete.is_err() {
                 warn!("Could not delete workout-template triggered by error inserting templates");
             }
@@ -201,9 +201,9 @@ mod tests {
     use lambda_http::http::header::{AUTHORIZATION, HeaderValue};
     use salamandra_server::lib::utils::tests::{insert_helper, pg_container, test_jwt, Items};
 
-    async fn setup_template(db_pool: DBPool) -> (Uuid, CreateWkTemplateRequest) {
-        let user_id = insert_helper(1, Items::Users, db_pool.clone(), None).await[0];
-        let exercise_id = insert_helper(1, Items::Exercises, db_pool, None).await[0];
+    async fn setup_template(connector: &DBConnector) -> (Uuid, CreateWkTemplateRequest) {
+        let user_id = insert_helper(1, Items::Users, connector, None).await[0];
+        let exercise_id = insert_helper(1, Items::Exercises, connector, None).await[0];
 
         let mut elements = Vec::new();
         for position in 1..5 {
@@ -229,8 +229,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_workout_template_success() {
-        let (db_pool, _container) = pg_container().await;
-        let (user_id, payload) = setup_template(db_pool.clone()).await;
+        let (connector, _container) = pg_container().await;
+        let (user_id, payload) = setup_template(&connector).await;
         let jwt = test_jwt(user_id);
 
         let mut req = Request::default();
@@ -240,7 +240,7 @@ mod tests {
             HashMap::from([("user_id".to_string(), user_id.to_string())])
             );
 
-        let resp = create_workout_template(req, Some(db_pool)).await;
+        let resp = create_workout_template(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::CREATED);
@@ -255,7 +255,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_workout_template_invalid_user_ids() {
-        let (db_pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let user_id = Uuid::new_v4();
         let jwt = test_jwt(user_id);
 
@@ -265,11 +265,12 @@ mod tests {
             HashMap::from([("user_id".to_string(), user_id.to_string())])
             );
 
-        let resp = create_workout_template(req, Some(db_pool)).await;
+        let resp = create_workout_template(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
+
 
     #[derive(Serialize, Deserialize)]
     struct BadPayload {
@@ -278,9 +279,9 @@ mod tests {
     #[tokio::test]
     async fn test_create_workout_template_invalid_payload() {
 
-        let (db_pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         { // ------ Wrong fields
-            let (user_id, _payload) = setup_template(db_pool.clone()).await;
+            let (user_id, _payload) = setup_template(&connector).await;
             let payload = BadPayload {test: 1};
             let jwt = test_jwt(user_id);
 
@@ -291,14 +292,14 @@ mod tests {
                 HashMap::from([("user_id".to_string(), user_id.to_string())])
                 );
 
-            let resp = create_workout_template(req, Some(db_pool.clone())).await;
+            let resp = create_workout_template(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         }
 
         { // ------ Invalid date
-            let (user_id, mut payload) = setup_template(db_pool.clone()).await;
+            let (user_id, mut payload) = setup_template(&connector).await;
             let jwt = test_jwt(user_id);
             payload.date_created = chrono::Utc::now()
                 .checked_add_signed(chrono::Duration::days(1))
@@ -312,14 +313,14 @@ mod tests {
                 HashMap::from([("user_id".to_string(), user_id.to_string())])
                 );
 
-            let resp = create_workout_template(req, Some(db_pool.clone())).await;
+            let resp = create_workout_template(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         }
 
         { // ------ Wrong exercise ids 
-            let (user_id, mut payload) = setup_template(db_pool.clone()).await;
+            let (user_id, mut payload) = setup_template(&connector).await;
             let jwt = test_jwt(user_id);
             payload.elements[0].exercise_id = Uuid::new_v4();
 
@@ -330,16 +331,16 @@ mod tests {
                 HashMap::from([("user_id".to_string(), user_id.to_string())])
                 );
 
-            let resp = create_workout_template(req, Some(db_pool.clone())).await;
+            let resp = create_workout_template(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::NOT_FOUND)
         }
 
         { // ------ Invalid element positions 
-            let (user_id1, mut payload1) = setup_template(db_pool.clone()).await;
-            let (user_id2, mut payload2) = setup_template(db_pool.clone()).await;
-            let (user_id3, mut payload3) = setup_template(db_pool.clone()).await;
+            let (user_id1, mut payload1) = setup_template(&connector).await;
+            let (user_id2, mut payload2) = setup_template(&connector).await;
+            let (user_id3, mut payload3) = setup_template(&connector).await;
 
             payload1.elements[0].position = 0;
             payload1.elements[1].position = 1;
@@ -374,7 +375,7 @@ mod tests {
                     HashMap::from([("user_id".to_string(), user_id.to_string())])
                     );
 
-                let resp = create_workout_template(req, Some(db_pool.clone())).await;
+                let resp = create_workout_template(req, &connector).await;
                 assert!(resp.is_ok());
                 let response = resp.unwrap();
                 assert_eq!(response.status(), StatusCode::BAD_REQUEST)
@@ -382,9 +383,9 @@ mod tests {
         }
 
         { // ------ Invalid element superset 
-            let (user_id1, mut payload1) = setup_template(db_pool.clone()).await;
-            let (user_id2, mut payload2) = setup_template(db_pool.clone()).await;
-            let (user_id3, mut payload3) = setup_template(db_pool.clone()).await;
+            let (user_id1, mut payload1) = setup_template(&connector).await;
+            let (user_id2, mut payload2) = setup_template(&connector).await;
+            let (user_id3, mut payload3) = setup_template(&connector).await;
 
             // Not sequential super set id
             payload1.elements[0].super_set = Some(1);
@@ -417,7 +418,7 @@ mod tests {
                     HashMap::from([("user_id".to_string(), user_id.to_string())])
                     );
 
-                let resp = create_workout_template(req, Some(db_pool.clone())).await;
+                let resp = create_workout_template(req, &connector).await;
                 assert!(resp.is_ok());
                 let response = resp.unwrap();
                 assert_eq!(response.status(), StatusCode::BAD_REQUEST)

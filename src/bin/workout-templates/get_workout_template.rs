@@ -7,12 +7,12 @@ use uuid::Uuid;
 use salamandra_server::lib::db::workout_templates_db::lookup_workout_template;
 use salamandra_server::lib::db::wk_template_elements_db::{select_wk_template_element_by_template, select_wk_template_element_by_template_full};
 use salamandra_server::lib::utils::handlers::{build_resp, extract_sub};
-use salamandra_server::lib::db::DBPool;
+use salamandra_server::lib::db::DBConnector;
 use salamandra_server::lib::errors::DBError;
 
 
 
-pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
+pub async fn get_workout_template(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
     let user_id: Uuid = match event.path_parameters().first("user_id").and_then(|s| Uuid::parse_str(s).ok()) {
         Some(id) => id,
@@ -33,7 +33,7 @@ pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Re
         Some(id) => id,
         None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid workout_template_id")),
     };
-    let template = match lookup_workout_template(template_id, test_db.clone()).await  {
+    let template = match lookup_workout_template(template_id, connector).await  {
         Ok(template) => {
             if template.user_id != user_id {
                 return Ok(build_resp(StatusCode::NOT_FOUND, "No template exists with the corresponding id"));
@@ -48,7 +48,7 @@ pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Re
     };
     match full {
         true => {
-        let full_elements = match select_wk_template_element_by_template_full(template_id, test_db).await {
+        let full_elements = match select_wk_template_element_by_template_full(template_id, connector).await {
             Ok(vector) => vector,
             Err(mes) => {
                 error!("INTERNAL SERVER ERROR: {}", mes);
@@ -70,7 +70,7 @@ pub async fn get_workout_template(event: Request, test_db: Option<DBPool>) -> Re
         Ok(build_resp(StatusCode::OK, template))
     },
         false => {
-            let elements = match select_wk_template_element_by_template(template_id, test_db).await {
+            let elements = match select_wk_template_element_by_template(template_id, connector).await {
                 Ok(vector) => vector,
                 Err(mes) => {
                     error!("INTERNAL SERVER ERROR: {}", mes);
@@ -106,7 +106,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_workout_template_invalid_ids() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
 
         { // ------ Invalid uuid format
             let user_id = Uuid::new_v4();
@@ -119,7 +119,7 @@ mod tests {
             let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id_string), ("workout_template_id".into(), workout_template_id_string)]));
 
 
-            let resp = get_workout_template(req, Some(pool.clone())).await;
+            let resp = get_workout_template(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -135,7 +135,7 @@ mod tests {
             let req = req.with_path_parameters(
                 HashMap::from([("user_id".to_string(), user_id_string)])
             );
-            let resp = get_workout_template(req, Some(pool.clone())).await;
+            let resp = get_workout_template(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -145,7 +145,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_get_workout_template_not_found() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let user_id = Uuid::new_v4();
         let user_id_string = user_id.to_string();
         let workout_template_id_string = Uuid::new_v4().to_string();
@@ -156,7 +156,7 @@ mod tests {
         let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id_string), ("workout_template_id".into(), workout_template_id_string)]));
 
 
-        let resp = get_workout_template(req, Some(pool.clone())).await;
+        let resp = get_workout_template(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -164,11 +164,11 @@ mod tests {
     
     #[tokio::test]
     async fn test_get_workout_template_success_full() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
        
-        let element_vector = insert_helper(5, Items::WkTemplateElements, pool.clone(), None).await;
-        let template_id = lookup_wk_template_element(element_vector[0], Some(pool.clone())).await.unwrap().workout_template_id;
-        let user_id = lookup_workout_template(template_id, Some(pool.clone())).await.unwrap().user_id;
+        let element_vector = insert_helper(5, Items::WkTemplateElements, &connector, None).await;
+        let template_id = lookup_wk_template_element(element_vector[0], &connector).await.unwrap().workout_template_id;
+        let user_id = lookup_workout_template(template_id, &connector).await.unwrap().user_id;
 
         let user_id_string = user_id.to_string();
         let jwt = test_jwt(user_id);
@@ -183,7 +183,7 @@ mod tests {
         let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id_string), ("workout_template_id".into(), template_id.to_string())]));
 
 
-        let resp = get_workout_template(req, Some(pool.clone())).await;
+        let resp = get_workout_template(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -198,11 +198,11 @@ mod tests {
     
     #[tokio::test]
     async fn test_get_workout_template_success_not_full() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
        
-        let element_vector = insert_helper(5, Items::WkTemplateElements, pool.clone(), None).await;
-        let template_id = lookup_wk_template_element(element_vector[0], Some(pool.clone())).await.unwrap().workout_template_id;
-        let user_id = lookup_workout_template(template_id, Some(pool.clone())).await.unwrap().user_id;
+        let element_vector = insert_helper(5, Items::WkTemplateElements, &connector, None).await;
+        let template_id = lookup_wk_template_element(element_vector[0], &connector).await.unwrap().workout_template_id;
+        let user_id = lookup_workout_template(template_id, &connector).await.unwrap().user_id;
 
         let user_id_string = user_id.to_string();
         let jwt = test_jwt(user_id);
@@ -212,7 +212,7 @@ mod tests {
         let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id_string), ("workout_template_id".into(), template_id.to_string())]));
 
 
-        let resp = get_workout_template(req, Some(pool.clone())).await;
+        let resp = get_workout_template(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
