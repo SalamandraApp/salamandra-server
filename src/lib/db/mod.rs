@@ -38,6 +38,7 @@ impl DBConnector {
             .map_err(|e| DBError::EnvError(e.to_string()))?;
         let db_username = env::var("DB_USERNAME").map_err(|e| DBError::EnvError(e.to_string()))?;
         let db_password = env::var("DB_PASSWORD").map_err(|e| DBError::EnvError(e.to_string()))?;
+        let db_name = env::var("DB_NAME").map_err(|e| DBError::EnvError(e.to_string()))?;
 
         // Establish TLS
         let root_certs = root_certs()?;
@@ -51,7 +52,7 @@ impl DBConnector {
             .port(port)
             .user(&db_username)
             .password(&db_password)
-            .dbname("postgres")
+            .dbname(&db_name)
             .connect_timeout(std::time::Duration::from_secs(30)).connect(tls)
             .await
             .map_err(|e| {
@@ -67,13 +68,34 @@ impl DBConnector {
 
         let connection = AsyncPgConnection::try_from(client).await
             .map_err(|error| DBError::ConnectionError(error.to_string()))?;
-        return Ok(connection);
+        Ok(connection)
     }
 
 
     async fn establish_test_pqsql_connection(&self) -> Result<AsyncPgConnection, DBError> {
-        Err(DBError::OperationError(String::from("Not implemented")))
+        if self.test_endpoint.is_none() {
+            return Err(DBError::OperationError(String::from("Test endpoint is not set")));
+        }
+
+        let (client, connection) = tokio_postgres::connect(&self.test_endpoint.clone().unwrap(), tokio_postgres::NoTls)
+            .await.map_err(|e| {
+                error!("Couldn't establish connection with database: {}", e.to_string());
+                DBError::ConnectionError(e.to_string())
+            })?;
+
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {}", e);
+            }
+        });
+
+        let connection = AsyncPgConnection::try_from(client).await
+            .map_err(|error| DBError::ConnectionError(error.to_string()))?;
+        Ok(connection)
     }
+
+
+
 }
 
 

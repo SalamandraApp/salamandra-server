@@ -69,7 +69,12 @@ jobs:
           PGPASSWORD=postgres psql -h postgres -U postgres -f all_up.sql
       
       - name: Start and Run Tests
-        env: 
+        env:
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_HOSTNAME: postgres
+          DB_PORT : 5432
+          DB_NAME : postgres
           DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
         run: |
           cargo lambda watch -a 0.0.0.0 &

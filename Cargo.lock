@@ -489,19 +489,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
-name = "bb8"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df7c2093d15d6a1d33b1f972e1c5ea3177748742b97a5f392aa83a65262c6780"
-dependencies = [
- "async-trait",
- "futures-channel",
- "futures-util",
- "parking_lot",
- "tokio",
-]
-
-[[package]]
 name = "bcder"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -815,7 +802,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acada1517534c92d3f382217b485db8a8638f111b0e3f2a2a8e26165050f77be"
 dependencies = [
  "async-trait",
- "bb8",
  "diesel",
  "futures-util",
  "scoped-futures",
@@ -2261,7 +2247,6 @@ dependencies = [
  "aws-sdk-rds",
  "aws-sigv4",
  "base64 0.22.1",
- "bb8",
  "chrono",
  "diesel",
  "diesel-async",
