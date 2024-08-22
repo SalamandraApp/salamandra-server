@@ -4,6 +4,8 @@ pub enum DBError {
     OperationError(String),
     ItemNotFound(String),
     UniqueViolation(String),
+    AuthError(String),
+    EnvError(String),
 }
 
 impl std::fmt::Display for DBError {
@@ -13,6 +15,8 @@ impl std::fmt::Display for DBError {
             DBError::OperationError(msg) => write!(f, "OperationError: {}", msg),
             DBError::ItemNotFound(msg) => write!(f, "ItemNotFound: {}", msg),
             DBError::UniqueViolation(msg) => write!(f, "UniqueViolation: {}", msg),
+            DBError::AuthError(msg) => write!(f, "AuthError: {}", msg),
+            DBError::EnvError(msg) => write!(f, "EnvError: {}", msg),
         }
     }
 }
