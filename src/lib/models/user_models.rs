@@ -12,11 +12,11 @@ pub struct User {
     pub display_name: String,
     pub date_joined: NaiveDate,
     pub date_of_birth: Option<NaiveDate>,
-    pub height: Option<i32>,
+    pub height: Option<i16>,
     pub weight: Option<f32>,
-    pub gender: Option<i32>,
-    pub fitness_goal: Option<i32>,
-    pub fitness_level: Option<i32>,
+    pub gender: Option<i16>,
+    pub fitness_goal: Option<i16>,
+    pub fitness_level: Option<i16>,
 }
 impl Default for User {
     fn default() -> Self {

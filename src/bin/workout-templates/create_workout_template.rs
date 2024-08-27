@@ -14,39 +14,65 @@ use salamandra_server::lib::models::wk_template_elements_models::NewWkTemplateEl
 use salamandra_server::lib::utils::handlers::{build_resp, extract_sub};
 use salamandra_server::lib::errors::DBError;
 
+const BASE_ERROR: &str = "Invalid payload. ";
+const DOC_LINK: &str = ". See https://github.com/SalamandraApp/salamandra-server/wiki/Workout-executions-API#createwkexecutionrequest for the correct format. If you think its an error leave an issue in the repository.";
 
 #[derive(Serialize, Deserialize)]
 struct CreateWkTemplateRequest {
-    pub name: String,
-    pub description: Option<String>,
-    pub date_created: chrono::NaiveDate,
-    pub elements: Vec<WkTemplateElementRequest>,
+    name: String,
+    description: Option<String>,
+    date_created: chrono::NaiveDate,
+    elements: Vec<WkTemplateElementRequest>,
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct WkTemplateElementRequest {
     exercise_id: Uuid,
-    position: usize,
-    reps: usize,
-    sets: usize,
+    position: i16,
+    reps: i16,
+    sets: i16,
     weight: Option<f32>,
-    rest: usize,
-    super_set: Option<usize>,
+    rest: i16,
+    super_set: Option<i16>,
 }
 
+impl CreateWkTemplateRequest {
+    fn to_new_template(&self, user_id: Uuid) -> NewWorkoutTemplate {
+        NewWorkoutTemplate {
+            user_id,
+            name: self.name.clone(),
+            description: self.description.clone(),
+            date_created: self.date_created,
+        }
+    }
+}
+impl WkTemplateElementRequest {
+    fn to_new_element(&self, workout_template_id: Uuid) -> NewWkTemplateElement {
+        NewWkTemplateElement {
+            workout_template_id,
+            exercise_id: self.exercise_id,
+            position: self.position,
+            reps: self.reps,
+            sets: self.sets,
+            weight: self.weight,
+            rest: self.rest,
+            super_set: self.super_set,
+        }
+    }
+}
 
+/// Insert new workout template and its elements
 pub async fn create_workout_template(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
-    let user_id = match event.path_parameters().first("user_id").and_then(|s| Uuid::parse_str(s).ok()) {
-        Some(id) => id,
-        None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid user_id")),
-    };
+    // Get path parameter
+    let user_id = Uuid::parse_str(event.path_parameters().first("user_id").unwrap()).unwrap();
 
+    // Check user is the same as sub in claim
     match extract_sub(event.headers(), Some(user_id)) {
         Ok(_) => (),
         Err(resp) => return Ok(resp)
     };
 
+    // Check and extract payload
     let body = match event.into_body() {
         Body::Text(body) => body,
         _ => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid payload")),
@@ -57,18 +83,17 @@ pub async fn create_workout_template(event: Request, connector: &DBConnector) ->
     };
 
     // Check input
-    // - Date
-    // - Number of elements
-    // - Position and super set
-    let (valid, message) = valid_position_super_set(&req.elements);
-    let n = req.elements.len();
-    if chrono::Utc::now().date_naive() < req.date_created
-        || n == 0 
-        || !valid {
-            let bad_request_message = format!("Invalid payload: {}. See https://github.com/SalamandraApp/salamandra-server/wiki/Workout-templates-API#createwktemplaterequest for the correct format", message);
-            return Ok(build_resp(StatusCode::BAD_REQUEST, bad_request_message));
+    if chrono::Utc::now().date_naive() < req.date_created {
+        return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid payload: date can't be in the future"));
     }
 
+    // Validate elements
+    match validate_template(&req.elements){
+        Ok(_) => (),
+        Err(error_message) => return Ok(build_resp(StatusCode::BAD_REQUEST, error_message))
+    };
+
+    // Validate that the ids exist
     let exercise_ids: HashSet<Uuid> = req.elements.iter().map(|element| element.exercise_id).collect();
     match validate_exercises(exercise_ids.into_iter().collect(), connector).await {
         Ok(valid) => {
@@ -81,14 +106,12 @@ pub async fn create_workout_template(event: Request, connector: &DBConnector) ->
             return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     }
-    let new_workout_template = NewWorkoutTemplate {
-        user_id: user_id.clone(),
-        name: req.name.clone(),
-        description: req.description.clone(),
-        date_created: req.date_created,
-    };
+
+    // Construct and insert template
+    let new_workout_template = req.to_new_template(user_id);
+
     // Insert template
-    let new_workout_template: WorkoutTemplate = match insert_workout_template(&new_workout_template, connector).await {
+    let workout_template: WorkoutTemplate = match insert_workout_template(&new_workout_template, connector).await {
         Ok(template) => template,
         Err(DBError::UniqueViolation(mes)) => {
             // should never trigger since the primary key is only the UUID
@@ -101,28 +124,17 @@ pub async fn create_workout_template(event: Request, connector: &DBConnector) ->
         }
     };
 
-    let new_workout_template_id = new_workout_template.id;
     // Create template elements
-    let mut new_template_elements: Vec<NewWkTemplateElement> = Vec::new();
-    for i in 0..n {
-        let new_element = NewWkTemplateElement {
-            workout_template_id: new_workout_template_id.clone(),
-            exercise_id: req.elements[i].exercise_id,
-            position: req.elements[i].position as i32,
-            reps: req.elements[i].reps as i32,
-            sets: req.elements[i].sets as i32,
-            weight: req.elements[i].weight,
-            rest: req.elements[i].rest as i32,
-            super_set: req.elements[i].super_set.map(|s| s as i32),
-        };
-        new_template_elements.push(new_element);
-    }
+    let new_elements: Vec<NewWkTemplateElement> = req.elements
+        .iter()
+        .map(|elem| elem.to_new_element(workout_template.id))
+        .collect();
 
     // Insert template elements
-    match insert_batch_wk_template_elements(&new_template_elements, connector).await {
+    match insert_batch_wk_template_elements(&new_elements, connector).await {
         Ok(elements) => {
             let response = WkTemplateWithElements {
-                workout_template: new_workout_template,
+                workout_template,
                 elements,
             };
             Ok(build_resp(StatusCode::CREATED, response))
@@ -134,7 +146,7 @@ pub async fn create_workout_template(event: Request, connector: &DBConnector) ->
         Err(error) => {
             // Should never trigger because all values are checked before hand
             warn!("Could not insert workout-template element: {}", error);
-            let result_delete = delete_workout_template(user_id, new_workout_template_id, connector).await;
+            let result_delete = delete_workout_template(user_id, workout_template.id, connector).await;
             if result_delete.is_err() {
                 warn!("Could not delete workout-template triggered by error inserting templates");
             }
@@ -143,35 +155,51 @@ pub async fn create_workout_template(event: Request, connector: &DBConnector) ->
     }
 }
 
-
-fn valid_position_super_set(items: &[WkTemplateElementRequest]) -> (bool, String) {
+/// Check request before inserting
+/// * All values >= 0
+/// * Sets, reps, weight > 0
+/// * Position sequential from 1
+/// * Superset sequential from 1 with repeats, at least 2 repeats for each non null value
+/// * Positions in each non null superset value must be sequential
+fn validate_template(items: &[WkTemplateElementRequest]) -> Result<(), String> {
     if items.is_empty() {
-        return (false, "There must be at least one element in the workout template".to_string());
+        return Err(format!("{}There must be at least one element in the workout template{}", BASE_ERROR, DOC_LINK));
     }
    
     // Sets and reps over 0
-    if items.iter().any(|item| item.sets == 0 || item.reps == 0) {
-        return (false, "All sets and reps values must be at least 1".to_string());
+    if items.iter().any(|item| item.sets <= 0 || item.reps <= 0 || item.rest < 0 || item.weight.map_or(false, |w| w <= 0.0)) {
+        return Err(format!("{}All sets, reps and weight (if not none) must be at least 1. No values can't be negative{}", BASE_ERROR, DOC_LINK));
     }
 
     // Sequential position 
-    let mut positions: Vec<usize> = items.iter().map(|item| item.position).collect();
+    let mut positions: Vec<i16> = items.iter().map(|item| item.position).collect();
     positions.sort_unstable();
-    if positions != (1..items.len() + 1).collect::<Vec<_>>() { 
-        return (false, "The element's positions must be sequential, starting from 1".to_string());
+    if positions != (1..=items.len() as i16).collect::<Vec<_>>() { 
+        return Err(format!("{}The element's positions must be sequential, starting from 1{}", BASE_ERROR, DOC_LINK));
     }
 
     // Group by superset
-    let mut super_set_map: HashMap<Option<usize>, Vec<&WkTemplateElementRequest>> = HashMap::new();
+    let mut super_set_map: HashMap<Option<i16>, Vec<&WkTemplateElementRequest>> = HashMap::new();
     for item in items {
         super_set_map.entry(item.super_set).or_insert_with(Vec::new).push(item);
     }
 
-    // Ensure super set values start at 1 and are sequential
-    let mut super_set_values: Vec<usize> = super_set_map.keys().filter_map(|&k| k).collect();
-    super_set_values.sort_unstable();
-    if super_set_values != (1..super_set_values.len() + 1).collect::<Vec<_>>() {
-        return (false, "The element's non-null super_set must be sequential, starting from 1".to_string());
+    // SUPER SET
+    let mut super_set_map: HashMap<Option<i16>, Vec<&WkTemplateElementRequest>> = HashMap::new();
+    for item in items {
+        super_set_map.entry(item.super_set).or_insert_with(Vec::new).push(item);
+    }
+    let mut unique_super_set_values: Vec<i16> = super_set_map.keys()
+        .filter_map(|&k| k)  
+        .collect::<HashSet<i16>>()  
+        .into_iter()
+        .collect();
+    unique_super_set_values.sort_unstable();
+
+    if !unique_super_set_values.is_empty() && 
+        (unique_super_set_values[0] != 1 || 
+         unique_super_set_values.windows(2).any(|w| w[1] - w[0] > 1)) {
+            return Err(format!("{}The non-null super_set values must be sequential, starting from 1 with repetitions{}", BASE_ERROR, DOC_LINK));
     }
 
     // Super set group
@@ -179,19 +207,20 @@ fn valid_position_super_set(items: &[WkTemplateElementRequest]) -> (bool, String
         if let Some(_) = super_set {
             // At least 2 exercises
             if group.len() < 2 {
-                return (false, "There must be at least 2 elements per super_set group".to_string());
+                return Err(format!("{}There must be at least 2 elements per super set group{}", BASE_ERROR, DOC_LINK));
             }
 
             // Sequential positions within superset
-            let mut ss_positions: Vec<usize> = group.iter().map(|item| item.position).collect();
+            let mut ss_positions: Vec<i16> = group.iter().map(|item| item.position).collect();
             ss_positions.sort_unstable();
-            if ss_positions != (ss_positions[0]..ss_positions[0] + group.len()).collect::<Vec<_>>() {
-                return (false, "In each super_set group all position values must be sequential".to_string());
+            let expected_ss_positions: Vec<i16> = (ss_positions[0]..=ss_positions[0] + group.len() as i16 - 1)
+                .collect();
+            if ss_positions != expected_ss_positions {
+                return Err(format!("{}In each super_set group all position values must be sequential{}", BASE_ERROR, DOC_LINK));
             }
         }
     }
-
-    (true, "".to_string())
+    Ok(())
 }
 
 #[cfg(test)]
@@ -201,21 +230,30 @@ mod tests {
     use lambda_http::http::header::{AUTHORIZATION, HeaderValue};
     use salamandra_server::lib::utils::tests::{insert_helper, pg_container, test_jwt, Items};
 
+    // TEST CASES
+    // * Create a template
+    // * Invalid ids
+    // * Invalid payload
+
     async fn setup_template(connector: &DBConnector) -> (Uuid, CreateWkTemplateRequest) {
         let user_id = insert_helper(1, Items::Users, connector, None).await[0];
         let exercise_id = insert_helper(1, Items::Exercises, connector, None).await[0];
 
-        let mut elements = Vec::new();
-        for position in 1..5 {
-            elements.push(WkTemplateElementRequest {
-                exercise_id,
-                position,
-                reps: 1,
-                sets: 1,
-                weight: Some(0.0),
-                super_set: None,
-                rest: 0,
-            });
+        let base_element = WkTemplateElementRequest {
+            exercise_id,
+            position: 1,  // We'll update this later
+            reps: 1,
+            sets: 1,
+            weight: Some(1.0),
+            super_set: None,
+            rest: 0,
+        };
+
+        let mut elements: Vec<WkTemplateElementRequest> = vec![base_element.clone(); 4];
+
+        // Update positions
+        for (index, element) in elements.iter_mut().enumerate() {
+            element.position = (index + 1) as i16;
         }
 
         let template = CreateWkTemplateRequest {
@@ -230,8 +268,13 @@ mod tests {
     #[tokio::test]
     async fn test_create_workout_template_success() {
         let (connector, _container) = pg_container().await;
-        let (user_id, payload) = setup_template(&connector).await;
+        let (user_id, mut payload) = setup_template(&connector).await;
         let jwt = test_jwt(user_id);
+
+        payload.elements[0].super_set = Some(1);
+        payload.elements[1].super_set = Some(1);
+        payload.elements[2].super_set = Some(2);
+        payload.elements[3].super_set = Some(2);
 
         let mut req = Request::default();
         req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
@@ -269,6 +312,7 @@ mod tests {
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
     }
 
 
@@ -280,24 +324,26 @@ mod tests {
     async fn test_create_workout_template_invalid_payload() {
 
         let (connector, _container) = pg_container().await;
-        { // ------ Wrong fields
-            let (user_id, _payload) = setup_template(&connector).await;
-            let payload = BadPayload {test: 1};
-            let jwt = test_jwt(user_id);
+        let (user_id, _payload) = setup_template(&connector).await;
+        let payload = BadPayload {test: 1};
+        let jwt = test_jwt(user_id);
 
-            let mut req = Request::default();
-            req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
-            *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
-            let req = req.with_path_parameters(
-                HashMap::from([("user_id".to_string(), user_id.to_string())])
-                );
+        let mut req = Request::default();
+        req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
+        *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
+        let req = req.with_path_parameters(
+            HashMap::from([("user_id".to_string(), user_id.to_string())])
+        );
 
-            let resp = create_workout_template(req, &connector).await;
-            assert!(resp.is_ok());
-            let response = resp.unwrap();
-            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-        }
+        let resp = create_workout_template(req, &connector).await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
 
+    #[tokio::test]
+    async fn test_create_workout_template_invalid_fields() {
+        let (connector, _container) = pg_container().await;
         { // ------ Invalid date
             let (user_id, mut payload) = setup_template(&connector).await;
             let jwt = test_jwt(user_id);
@@ -317,6 +363,11 @@ mod tests {
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+            if let Body::Text(body) = response.into_body() {
+                let body_string: String = body;
+                let unescaped_body = serde_json::from_str::<String>(&body_string).unwrap();
+                assert_eq!(unescaped_body, "Invalid payload: date can't be in the future");
+            }
         }
 
         { // ------ Wrong exercise ids 
@@ -334,37 +385,21 @@ mod tests {
             let resp = create_workout_template(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
-            assert_eq!(response.status(), StatusCode::NOT_FOUND)
+            assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
         }
-
-        { // ------ Invalid element positions 
+        { // Negative values
+            let (connector, _container) = pg_container().await;
             let (user_id1, mut payload1) = setup_template(&connector).await;
-            let (user_id2, mut payload2) = setup_template(&connector).await;
-            let (user_id3, mut payload3) = setup_template(&connector).await;
 
-            payload1.elements[0].position = 0;
-            payload1.elements[1].position = 1;
-            payload1.elements[2].position = 1;
-            payload1.elements[3].position = 2;
+            payload1.elements[0].reps = 0;
+            payload1.elements[0].rest = -1;
 
-            payload2.elements[0].position = 1;
-            payload2.elements[1].position = 2;
-            payload2.elements[2].position = 8;
-            payload2.elements[3].position = 3;
-
-            payload3.elements[0].position = 0;
-            payload3.elements[1].position = 1;
-            payload3.elements[2].position = 3;
-            payload3.elements[3].position = 4;
 
             let jwt1 = test_jwt(user_id1);
-            let jwt2 = test_jwt(user_id2);
-            let jwt3 = test_jwt(user_id3);
 
             let payloads = vec![
                 (user_id1, jwt1, payload1),
-                (user_id2, jwt2, payload2),
-                (user_id3, jwt3, payload3),
             ];
 
             for (user_id, jwt, payload) in payloads {
@@ -373,57 +408,126 @@ mod tests {
                 *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
                 let req = req.with_path_parameters(
                     HashMap::from([("user_id".to_string(), user_id.to_string())])
-                    );
+                );
 
                 let resp = create_workout_template(req, &connector).await;
                 assert!(resp.is_ok());
                 let response = resp.unwrap();
-                assert_eq!(response.status(), StatusCode::BAD_REQUEST)
+                assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+                if let Body::Text(body) = response.into_body() {
+                    let body_string: String = body;
+                    let unescaped_body = serde_json::from_str::<String>(&body_string).unwrap();
+                    assert_eq!(unescaped_body, format!("{}All sets, reps and weight (if not none) must be at least 1. No values can't be negative{}", BASE_ERROR, DOC_LINK));
+                }
             }
         }
+    }
 
-        { // ------ Invalid element superset 
-            let (user_id1, mut payload1) = setup_template(&connector).await;
-            let (user_id2, mut payload2) = setup_template(&connector).await;
-            let (user_id3, mut payload3) = setup_template(&connector).await;
+    #[tokio::test]
+    async fn test_create_workout_template_invalid_position() {
+        let (connector, _container) = pg_container().await;
+        let (user_id1, mut payload1) = setup_template(&connector).await;
+        let (user_id2, mut payload2) = setup_template(&connector).await;
+        let (user_id3, mut payload3) = setup_template(&connector).await;
 
-            // Not sequential super set id
-            payload1.elements[0].super_set = Some(1);
-            payload1.elements[1].super_set = Some(1);
-            payload1.elements[2].super_set = Some(3);
-            payload1.elements[3].super_set = Some(3);
+        payload1.elements[0].position = 0;
+        payload1.elements[1].position = 1;
+        payload1.elements[2].position = 1;
+        payload1.elements[3].position = 2;
 
-            // Only 1 exercise in superset
-            payload2.elements[0].super_set = Some(0);
+        payload2.elements[0].position = 1;
+        payload2.elements[1].position = 2;
+        payload2.elements[2].position = 8;
+        payload2.elements[3].position = 3;
 
-            // Not sequential in superset
-            payload3.elements[0].super_set = Some(0);
-            payload3.elements[2].super_set = Some(0);
+        payload3.elements[0].position = 0;
+        payload3.elements[1].position = 1;
+        payload3.elements[2].position = 3;
+        payload3.elements[3].position = 4;
 
-            let jwt1 = test_jwt(user_id1);
-            let jwt2 = test_jwt(user_id2);
-            let jwt3 = test_jwt(user_id3);
+        let jwt1 = test_jwt(user_id1);
+        let jwt2 = test_jwt(user_id2);
+        let jwt3 = test_jwt(user_id3);
 
-            let payloads = vec![
-                (user_id1, jwt1, payload1),
-                (user_id2, jwt2, payload2),
-                (user_id3, jwt3, payload3),
-            ];
+        let payloads = vec![
+            (user_id1, jwt1, payload1),
+            (user_id2, jwt2, payload2),
+            (user_id3, jwt3, payload3),
+        ];
 
-            for (user_id, jwt, payload) in payloads {
-                let mut req = Request::default();
-                req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
-                *req.body_mut() = Body::from(to_string(&payload).expect("Error serializing payload"));
-                let req = req.with_path_parameters(
-                    HashMap::from([("user_id".to_string(), user_id.to_string())])
-                    );
+        for (user_id, jwt, payload) in payloads {
+            let mut req = Request::default();
+            req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
+            *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
+            let req = req.with_path_parameters(
+                HashMap::from([("user_id".to_string(), user_id.to_string())])
+            );
 
-                let resp = create_workout_template(req, &connector).await;
-                assert!(resp.is_ok());
-                let response = resp.unwrap();
-                assert_eq!(response.status(), StatusCode::BAD_REQUEST)
-
+            let resp = create_workout_template(req, &connector).await;
+            assert!(resp.is_ok());
+            let response = resp.unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+            if let Body::Text(body) = response.into_body() {
+                let body_string: String = body;
+                let unescaped_body = serde_json::from_str::<String>(&body_string).unwrap();
+                assert_eq!(unescaped_body, format!("{}The element's positions must be sequential, starting from 1{}", BASE_ERROR, DOC_LINK));
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_workout_template_invalid_super_set() {
+        let (connector, _container) = pg_container().await;
+        let (user_id1, mut payload1) = setup_template(&connector).await;
+        let (user_id2, mut payload2) = setup_template(&connector).await;
+        let (user_id3, mut payload3) = setup_template(&connector).await;
+
+        // Not sequential super set id
+        payload1.elements[0].super_set = Some(1);
+        payload1.elements[1].super_set = Some(1);
+        payload1.elements[2].super_set = Some(3);
+        payload1.elements[3].super_set = Some(3);
+
+        // Only 1 exercise in superset
+        payload2.elements[0].super_set = Some(1);
+
+        // Not sequential in superset
+        payload3.elements[0].super_set = Some(1);
+        payload3.elements[2].super_set = Some(1);
+
+        let jwt1 = test_jwt(user_id1);
+        let jwt2 = test_jwt(user_id2);
+        let jwt3 = test_jwt(user_id3);
+
+        let payloads = vec![
+            (user_id1, jwt1, payload1),
+            (user_id2, jwt2, payload2),
+            (user_id3, jwt3, payload3),
+        ];
+        let responses = vec![
+            format!("{}The non-null super_set values must be sequential, starting from 1 with repetitions{}", BASE_ERROR, DOC_LINK),
+            format!("{}There must be at least 2 elements per super set group{}", BASE_ERROR, DOC_LINK),
+            format!("{}In each super_set group all position values must be sequential{}", BASE_ERROR, DOC_LINK)
+        ];
+
+        for (index, (user_id, jwt, payload)) in payloads.iter().enumerate() {
+            let mut req = Request::default();
+            req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
+            *req.body_mut() = Body::from(to_string(&payload).expect("Error serializing payload"));
+            let req = req.with_path_parameters(
+                HashMap::from([("user_id".to_string(), user_id.to_string())])
+            );
+
+            let resp = create_workout_template(req, &connector).await;
+            assert!(resp.is_ok());
+            let response = resp.unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+            if let Body::Text(body) = response.into_body() {
+                let body_string: String = body;
+                let unescaped_body = serde_json::from_str::<String>(&body_string).unwrap();
+                assert_eq!(unescaped_body, responses[index]);
+            }
+
         }
     }
 }

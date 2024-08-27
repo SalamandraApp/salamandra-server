@@ -8,10 +8,10 @@ use crate::schema::exercises;
 pub struct Exercise {
     pub id: Uuid,
     pub name: String,
-    pub main_muscle_group: Option<i32>,
-    pub secondary_muscle_group: Option<i32>,
-    pub necessary_equipment: Option<i32>,
-    pub exercise_type: Option<i32>,
+    pub main_muscle_group: Option<i16>,
+    pub secondary_muscle_group: Option<i16>,
+    pub necessary_equipment: Option<i16>,
+    pub exercise_type: Option<i16>,
 }
 
 
@@ -19,10 +19,10 @@ pub struct Exercise {
 #[diesel(table_name = exercises)]
 pub struct NewExercise {
     pub name: String,
-    pub main_muscle_group: Option<i32>,
-    pub secondary_muscle_group: Option<i32>,
-    pub necessary_equipment: Option<i32>,
-    pub exercise_type: Option<i32>,
+    pub main_muscle_group: Option<i16>,
+    pub secondary_muscle_group: Option<i16>,
+    pub necessary_equipment: Option<i16>,
+    pub exercise_type: Option<i16>,
 }
 impl Default for NewExercise {
     fn default() -> Self {

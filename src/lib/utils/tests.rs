@@ -6,8 +6,12 @@ use testcontainers_modules::{
     postgres, 
     testcontainers::runners::AsyncRunner
 };
+use crate::lib::db::wk_execution_elements_db::insert_batch_wk_execution_elements;
+use crate::lib::db::workout_executions_db::insert_workout_execution;
 use crate::lib::models::exercise_models::NewExercise;
 use crate::lib::models::user_models::User;
+use crate::lib::models::wk_execution_elements_models::NewWkExecutionElement;
+use crate::lib::models::workout_execution_models::NewWorkoutExecution;
 use crate::lib::models::workout_templates_models::NewWorkoutTemplate;
 use crate::lib::models::wk_template_elements_models::NewWkTemplateElement;
 use crate::lib::db::DBConnector;
@@ -96,12 +100,30 @@ pub async fn insert_helper(n: usize, items: Items, connector: &DBConnector, name
                 ids.push(insert_res.unwrap().id);
             }
         },
+        Items::WkExecutions => {
+            let new_template_id = Box::pin(insert_helper(1, Items::WkTemplates, connector, None)).await[0];
+            for _ in 0..n {
+                let new_execution = NewWorkoutExecution { workout_template_id: new_template_id.clone(), ..Default::default() };
+                let insert_res = insert_workout_execution(&new_execution, connector).await;
+                ids.push(insert_res.unwrap().id);
+            }
+        },
+
         Items::WkTemplateElements => {
             let workout_template_id = Box::pin(insert_helper(1, Items::WkTemplates, connector, None)).await.into_iter().next().unwrap();
             let exercise_ids = Box::pin(insert_helper(n, Items::Exercises, connector, Some("Push-up".to_string()))).await;
             for i in 0..n {
                 let new_element = NewWkTemplateElement{ workout_template_id, exercise_id: exercise_ids[i], ..Default::default() };
                 let insert_res = insert_batch_wk_template_elements(&vec![new_element], connector).await;
+                ids.push(insert_res.unwrap().into_iter().next().unwrap().id);
+            }
+        },
+        Items::WkExecutionElements => {
+            let workout_execution_id = Box::pin(insert_helper(1, Items::WkExecutions, connector, None)).await.into_iter().next().unwrap();
+            let exercise_ids = Box::pin(insert_helper(n, Items::Exercises, connector, Some("Push-up".to_string()))).await;
+            for i in 0..n {
+                let new_element = NewWkExecutionElement{ workout_execution_id, exercise_id: exercise_ids[i], ..Default::default() };
+                let insert_res = insert_batch_wk_execution_elements(&vec![new_element], connector).await;
                 ids.push(insert_res.unwrap().into_iter().next().unwrap().id);
             }
         },
@@ -113,7 +135,9 @@ pub enum Items {
     Users,
     Exercises,
     WkTemplates,
-    WkTemplateElements
+    WkTemplateElements,
+    WkExecutions,
+    WkExecutionElements,
 }
 
 

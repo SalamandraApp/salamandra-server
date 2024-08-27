@@ -8,14 +8,14 @@ use salamandra_server::lib::utils::handlers::build_resp;
 use salamandra_server::lib::db::DBConnector;
 use salamandra_server::lib::errors::DBError;
 
-
+/// Fetch user
+/// * Assumes user id has been previously checked
 pub async fn get_user(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
-    let user_id = match event.path_parameters().first("user_id").and_then(|s| Uuid::parse_str(s).ok()) {
-        Some(id) => id,
-        None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid user_id")),
-    };
+    // Get path parameter
+    let user_id = Uuid::parse_str(event.path_parameters().first("user_id").unwrap()).unwrap();
 
+    // Fetch from database
     match lookup_user(user_id, connector).await {
         Ok(user) => Ok(build_resp(StatusCode::OK, user)),
         Err(DBError::ItemNotFound(mes)) => Ok(build_resp(StatusCode::NOT_FOUND, mes)),
@@ -37,18 +37,9 @@ mod tests {
     use salamandra_server::lib::models::user_models::User;
     use salamandra_server::lib::db::users_db::insert_user;
 
-    #[tokio::test]
-    async fn test_get_user_invalid_user_id() {
-        let (connector, _container) = pg_container().await;
-        let user_id = String::from("INVALID-UUID");
-        let req = Request::default();
-        let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id)]));
-        
-        let resp = get_user(req, &connector).await;
-        assert!(resp.is_ok());
-        let response = resp.unwrap();
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    }
+    // TEST CASES
+    // * Non existing user
+    // * Existing user
 
     #[tokio::test]
     async fn test_get_user_not_found() {

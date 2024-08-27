@@ -10,9 +10,6 @@ use crate::lib::errors::DBError;
 use super::DBConnector;
 
 /// Inserts a new workout_template into the database and returns the inserted workout_template.
-///
-/// This function inserts a new workout_template into the `workout_templates` table.
-/// If the insertion is successful, the inserted `NewWorkoutTemplate` is returned.
 pub async fn insert_workout_template(new_template: &NewWorkoutTemplate, connector: &DBConnector) -> Result<WorkoutTemplate, DBError> {
     let mut conn = connector.rds_connection().await?;
 
@@ -31,10 +28,6 @@ pub async fn insert_workout_template(new_template: &NewWorkoutTemplate, connecto
 
 
 /// Returns a workout_template with the corresponding ID, or an error if not found.
-///
-/// This function performs a lookup for a workout_template by its primary key (UUID).
-/// If the workout_template is found, it is returned. Otherwise, an appropriate error
-/// is returned.
 pub async fn lookup_workout_template(template_id: Uuid, connector: &DBConnector) -> Result<WorkoutTemplate, DBError> {
     let mut conn = connector.rds_connection().await?;
     let workout_template = workouttemplates.find(template_id)
@@ -51,9 +44,6 @@ pub async fn lookup_workout_template(template_id: Uuid, connector: &DBConnector)
 }
 
 /// Selects workout template by user id
-///
-/// This function retrieves template for a given user id ID
-/// It returns a vector of `WorkoutTemplate` structs
 pub async fn select_workout_template_by_user(user_uuid: Uuid, connector: &DBConnector) -> Result<Vec<WorkoutTemplate>, DBError> {
     let mut conn = connector.rds_connection().await?;
     workouttemplates.filter(user_id.eq(user_uuid))
@@ -64,9 +54,6 @@ pub async fn select_workout_template_by_user(user_uuid: Uuid, connector: &DBConn
 
 
 /// Removes the corresponding workout template given th user and template id
-/// 
-/// It deletes the template given its primary key and the corresponding user id.
-/// This avoid mistakes deleting some other users workout-template
 pub async fn delete_workout_template(user_uuid: Uuid, template_id: uuid::Uuid, connector: &DBConnector) -> Result<usize, DBError> {
     let mut conn = connector.rds_connection().await?;
 
@@ -83,6 +70,12 @@ mod tests {
     use super::*;
     use crate::lib::utils::tests::{pg_container, insert_helper, Items};
 
+    // TEST CASES
+    // * Insert wrong user id
+    // * Insert lookip
+    // * Lookup non existing
+    // * Select by user none and multiple
+    // * Delete success and non existing
 
     #[tokio::test]
     async fn test_insert_workout_template_wrong_user_id() {

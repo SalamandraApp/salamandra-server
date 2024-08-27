@@ -53,8 +53,8 @@ pub async fn lookup_exercise(exercise_id: Uuid, connector: &DBConnector) -> Resu
 
 /// Searches for exercises with names starting with the given term.
 ///
-/// This function performs a case-insensitive search in the `exercises` table,
-/// returning all exercises whose names begin with the specified t
+/// Case-insensitive search in the `exercises` table,
+/// returning all exercises whose names begin with the specified term
 pub async fn search_exercises(term: &str, connector: &DBConnector) -> Result<Vec<Exercise>, DBError> {
 
     let mut conn = connector.rds_connection().await?;
@@ -71,15 +71,15 @@ pub async fn search_exercises(term: &str, connector: &DBConnector) -> Result<Vec
 /// This function verifies whether all given UUIDs correspond to existing exercises
 /// in the database. It returns `true` if all UUIDs are valid, and `false` otherwise.
 pub async fn validate_exercises(exercise_ids: Vec<Uuid>, connector: &DBConnector) -> Result<bool, DBError> {
-    let n = exercise_ids.len();
+    
     let mut conn = connector.rds_connection().await?;
-    let res = exercises.filter(id.eq_any(&exercise_ids))
+    let n = exercise_ids.len();
+    let found_uuids = exercises.filter(id.eq_any(&exercise_ids))
             .select(id)
             .load::<Uuid>(&mut conn)
             .await
-            .map_err(|error| DBError::OperationError(error.to_string()));
+            .map_err(|error| DBError::OperationError(error.to_string()))?;
 
-    let found_uuids = res?;
     Ok(found_uuids.len() == n)
 }
 
@@ -89,6 +89,13 @@ pub async fn validate_exercises(exercise_ids: Vec<Uuid>, connector: &DBConnector
 mod tests {
     use super::*;
     use crate::lib::utils::tests::{pg_container, insert_helper, Items};
+
+    // TEST CASES
+    // * Insert and lookup inserted exercise
+    // * Insert with duplicate PK
+    // * Lookup non exisiting
+    // * Search multiple and empty
+    // * Validate all valid, no valid, some valid
 
     #[tokio::test]
     async fn test_insert_lookup_exercise() {

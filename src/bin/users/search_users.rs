@@ -20,13 +20,16 @@ struct UserSearchResult {
     users: Vec<UserInfo>,
 }
 
+/// Return all users with username that matches the given prefix
 pub async fn search_users(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
+    // Check query paramater
     let username = match event.query_string_parameters().first("username") {
         Some(name) => name.to_string(),
         None => return Ok(build_resp(StatusCode::BAD_REQUEST, ""))
     };
 
+    // Search in database
     let search_result = match search_username(&username, connector).await {
         Ok(vec) => vec,
         Err(error) => {
@@ -34,6 +37,8 @@ pub async fn search_users(event: Request, connector: &DBConnector) -> Result<Res
             return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     };
+    
+    // Format and return results
     let user_info: Vec<UserInfo> = search_result.into_iter()
         .map(|user| UserInfo {
             username: user.username,
@@ -52,6 +57,12 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
     use salamandra_server::lib::utils::tests::{pg_container, insert_helper, Items};
+
+    // TEST CASES
+    // * Invalid query
+    //      * No query parameters
+    //      * Other parameters
+    // * Search multiple users
 
     #[tokio::test]
     async fn test_search_users_invalid_query() {

@@ -1,8 +1,10 @@
-use lambda_http::{Body, Response, http::{StatusCode, HeaderMap}};
+use lambda_http::{Body, Response, http::{StatusCode, HeaderMap}, Error};
 use base64::prelude::*;
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
+
+pub const UUID_PATTERN: &str = r"[0-9a-fA-F-]{36}";
 
 pub fn build_resp<T>(status: StatusCode, data: T) -> Response<Body>
 where
@@ -48,4 +50,8 @@ pub fn extract_sub(headers: &HeaderMap, url_user_id: Option<Uuid>) -> Result<Uui
     }
 
     Ok(extracted_id)
+}
+
+pub fn not_found() -> Result<Response<Body>, Error> {
+    Ok(build_resp(StatusCode::NOT_FOUND, "Not found"))
 }

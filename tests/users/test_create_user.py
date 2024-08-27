@@ -3,8 +3,17 @@ import uuid
 from datetime import datetime
 from tests.utils import TestHelper, TestError
 
-class TestExercisesCreateUsers(unittest.TestCase):
-    
+class TestUsersCreateUsers(unittest.TestCase):
+   
+    """
+    TEST CASES
+    * Incorrect payload
+    * Success creating
+    * Conflict
+    * Unauthorized, without JWT
+    * Forbidden, user trying to create another one
+    """
+
     def test_create_user_incorrect_payload(self):
         try:
             id = str(uuid.uuid4())

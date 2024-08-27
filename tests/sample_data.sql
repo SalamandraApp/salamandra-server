@@ -40,3 +40,11 @@ VALUES
 (gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout D'), (SELECT id FROM Exercises WHERE name = 'Push Up'),  1, 1, 1, 1, 1, NULL),
 (gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout D'), (SELECT id FROM Exercises WHERE name = 'Pull Up'),  1, 1, 1, 1, 1, NULL),
 (gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout D'), (SELECT id FROM Exercises WHERE name = 'Squat'),    1, 1, 1, 1, 1, NULL);
+
+-- Insert workout templates
+INSERT INTO WorkoutExecutions(id, workout_template_id, date, survey)
+VALUES
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout A'), CURRENT_DATE, 0),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout B'), CURRENT_DATE, 0),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout C'), CURRENT_DATE, 0),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout D'), CURRENT_DATE, 0);
