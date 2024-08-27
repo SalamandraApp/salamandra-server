@@ -10,10 +10,10 @@ use crate::lib::errors::DBError;
 use super::DBConnector;
 
 
+/// Returns a wk_template_element with the corresponding ID, or an error if not found.
 pub async fn insert_batch_wk_template_elements(new_elements: &Vec<NewWkTemplateElement>, connector: &DBConnector) -> Result<Vec<WkTemplateElement>, DBError> {
 
     let mut conn = connector.rds_connection().await?;
-
 
     diesel::insert_into(wktemplateelements)
         .values(new_elements)
@@ -30,10 +30,6 @@ pub async fn insert_batch_wk_template_elements(new_elements: &Vec<NewWkTemplateE
 
 
 /// Returns a wk_template_element with the corresponding ID, or an error if not found.
-///
-/// This function performs a lookup for a wk_template_element by its primary key (UUID).
-/// If the wk_template_element is found, it is returned. Otherwise, an appropriate error
-/// is returned.
 pub async fn lookup_wk_template_element(wk_template_element_id: Uuid, connector: &DBConnector) -> Result<WkTemplateElement, DBError> {
 
     let mut conn = connector.rds_connection().await?;
@@ -62,16 +58,9 @@ use crate::schema::exercises::dsl::{
 };
 
 /// Selects detailed template elements by workout template ID.
-///
-/// This function retrieves detailed template elements for a given workout template ID
-/// by performing an inner join between the `templateelements` and `exercises` tables.
-/// It returns a vector of `TemplateElementDetailed` structs containing detailed information
-/// about each template element.
 pub async fn select_wk_template_element_by_template_full(wk_template_id: Uuid, connector: &DBConnector) -> Result<Vec<WkTemplateElementFull>, DBError> {
 
-    let mut conn = connector.rds_connection().await.map_err(|error| {
-        DBError::ConnectionError(error.to_string())
-    })?;
+    let mut conn = connector.rds_connection().await?;
 
     wktemplateelements
         .filter(workout_template_id.eq(wk_template_id))
@@ -102,9 +91,7 @@ pub async fn select_wk_template_element_by_template_full(wk_template_id: Uuid, c
 /// This function retrieves detailed template elements for a given workout template ID
 pub async fn select_wk_template_element_by_template(wk_template_id: Uuid, connector: &DBConnector) -> Result<Vec<WkTemplateElement>, DBError> {
 
-    let mut conn = connector.rds_connection().await.map_err(|error| {
-        DBError::ConnectionError(error.to_string())
-    })?;
+    let mut conn = connector.rds_connection().await?;
 
     wktemplateelements
         .filter(workout_template_id.eq(wk_template_id))
@@ -130,6 +117,12 @@ mod tests {
     use super::*;
     use crate::lib::utils::tests::{pg_container, insert_helper, Items};
 
+    // TEST CASES
+    // * Insert batch and lookup
+    // * Insert wrong id
+    // * Lookup non existing
+    // * Select full and none
+        
     #[tokio::test]
     async fn test_insert_batch_lookup_template_element() {
         let (connector, _container) = pg_container().await;

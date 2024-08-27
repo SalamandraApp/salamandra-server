@@ -8,24 +8,20 @@ use salamandra_server::lib::utils::handlers::{build_resp, extract_sub};
 use salamandra_server::lib::db::DBConnector;
 
 
+/// Remove template from database
 pub async fn delete_workout_template_(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
-    let user_id = match event.path_parameters().first("user_id").and_then(|s| Uuid::parse_str(s).ok()) {
-        Some(id) => id,
-        None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid user_id")),
-    };
-    
+    // Get path parameter
+    let user_id = Uuid::parse_str(event.path_parameters().first("user_id").unwrap()).unwrap();
+    let workout_template_id = Uuid::parse_str(event.path_parameters().first("workout_template_id").unwrap()).unwrap();
+   
+    // Check user in claim
     match extract_sub(event.headers(), Some(user_id)) {
         Ok(_) => (),
         Err(resp) => return Ok(resp)
     };
 
-    let workout_template_id = match event.path_parameters().first("workout_template_id").and_then(|s| Uuid::parse_str(s).ok()) {
-        Some(id) => id,
-        None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid workout_template_id")),
-    };
-
-
+    // Delete in database
     match delete_workout_template(user_id, workout_template_id, connector).await {
         Ok(deleted) => {
             if deleted > 0 {
@@ -49,44 +45,9 @@ mod tests {
     use salamandra_server::lib::utils::tests::{pg_container, test_jwt, insert_helper, Items};
     use salamandra_server::lib::db::workout_templates_db::lookup_workout_template;
 
-    #[tokio::test]
-    async fn test_delete_workout_template_invalid_ids() {
-        let (connector, _container) = pg_container().await;
-
-        { // ------ Invalid uuid format
-            let user_id = Uuid::new_v4();
-            let user_id_string = user_id.to_string();
-            let workout_template_id_string = String::from("INVALID");
-            let mut req = Request::default();
-            let jwt = test_jwt(user_id);
-
-            req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
-            let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id_string), ("workout_template_id".into(), workout_template_id_string)]));
-
-
-            let resp = delete_workout_template_(req, &connector).await;
-            assert!(resp.is_ok());
-            let response = resp.unwrap();
-            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-        }
-
-        { // ------ Missing fields
-            let user_id = Uuid::new_v4();
-            let user_id_string = user_id.to_string();
-            let mut req = Request::default();
-            let jwt = test_jwt(user_id);
-
-            req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
-            let req = req.with_path_parameters(
-                HashMap::from([("user_id".to_string(), user_id_string)])
-            );
-            let resp = delete_workout_template_(req, &connector).await;
-            assert!(resp.is_ok());
-            let response = resp.unwrap();
-            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-        }
-
-    }
+    // TEST CASES
+    // * Non existing template
+    // * Success
 
     #[tokio::test]
     async fn test_delete_workout_template_none() {

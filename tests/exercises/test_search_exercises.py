@@ -4,6 +4,13 @@ from tests.utils import TestHelper, TestError
 
 class TestExercisesSearchExercises(unittest.TestCase):
 
+    """
+    TEST CASES
+    * No query parameter
+    * No exercises match
+    * Multiple match
+    """
+
     def test_search_exercise_incorrect_query_parameters(self):
         try:
             no_parameter = TestHelper().invoke(

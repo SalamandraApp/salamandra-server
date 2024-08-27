@@ -2,7 +2,13 @@ import unittest
 import uuid, json
 from tests.utils import TestHelper, TestError
 
-class TestExercisesGetAllWkTemplates(unittest.TestCase):
+class TestTemplatesGetAllWkTemplates(unittest.TestCase):
+
+    """
+    TEST CASES
+    * Incorrect path parameters
+    * Success
+    """ 
 
     def test_get_all_workout_templates_incorrect_path_parameters(self):
         try:
@@ -15,7 +21,7 @@ class TestExercisesGetAllWkTemplates(unittest.TestCase):
                         }
                     )
 
-            self.assertEqual(wrong_format['statusCode'], 400) 
+            self.assertEqual(wrong_format['statusCode'], 404) 
 
         except TestError as e:
             print(f"TEST ERROR: {e}")

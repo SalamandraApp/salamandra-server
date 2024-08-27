@@ -18,20 +18,28 @@ struct CreateUserRequest {
     date_joined: NaiveDate,
 }
 
+/// Insert user after it has been registered in cognito
 pub async fn create_user(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
+    // Format request
     if let Body::Text(body) = event.clone().into_body() {
         if let Ok(req) = serde_json::from_str::<CreateUserRequest>(&body) {
+
+            // Check the user is creating themselves, not someone else
             match extract_sub(event.headers(), Some(req.uuid)) {
                 Ok(_) => (),
                 Err(resp) => return Ok(resp)
             };
+
+            // Create user with Cognito UUID
             let new_user = User {
                 id: req.uuid,
                 username: req.username,
                 date_joined: req.date_joined,
                 ..Default::default()
             };
+
+            // Insert in database
             let resp = match insert_user(&new_user, connector).await {
                 Ok(user) => build_resp(StatusCode::CREATED, user),
                 Err(DBError::UniqueViolation(mes)) => {
@@ -72,6 +80,13 @@ mod tests {
         date_joined: String,
     }
 
+    // TEST CASES
+    // * Invalid payload
+    //      * Different fields
+    //      * Fields with different types
+    //      * No payload
+    // * Successfully create user
+    // * Try to create existing user
 
     #[tokio::test]
     async fn test_create_user_invalid_payload() {

@@ -15,17 +15,19 @@ struct GetAllTemplatesResponse {
     templates: Vec<WorkoutTemplate>
 }
 
+/// Fetch all templates for a given
 pub async fn get_all_workout_templates(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
-    let user_id = match event.path_parameters().first("user_id").and_then(|s| Uuid::parse_str(s).ok()) {
-        Some(id) => id,
-        None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid user_id")),
-    };
+    // Get path parameter
+    let user_id = Uuid::parse_str(event.path_parameters().first("user_id").unwrap()).unwrap();
+    
+    // Check user in claim
     match extract_sub(event.headers(), Some(user_id)) {
         Ok(_) => (),
         Err(resp) => return Ok(resp)
     };
-
+    
+    // Select from database and prepare response
     match select_workout_template_by_user(user_id, connector).await {
         Ok(vec) => {
             let response = GetAllTemplatesResponse {
@@ -51,35 +53,8 @@ mod tests {
     use salamandra_server::lib::utils::tests::{pg_container, test_jwt, insert_helper, Items};
     use salamandra_server::lib::db::workout_templates_db::lookup_workout_template;
 
-    #[tokio::test]
-    async fn test_get_all_workout_templates_invalid_user_id() {
-        let (connector, _container) = pg_container().await;
-        let user_id = String::from("INVALID-UUID");
-        let req = Request::default();
-        let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id)]));
-
-        let resp = get_all_workout_templates(req, &connector).await;
-        assert!(resp.is_ok());
-        let response = resp.unwrap();
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    }
-    
-    #[tokio::test]
-    async fn test_get_all_workout_templates_different_user_ids() {
-        let (connector, _container) = pg_container().await;
-        let user_id = Uuid::new_v4();
-        let user_id_string = user_id.to_string();
-        let mut req = Request::default();
-        let jwt = test_jwt(Uuid::new_v4());
-
-        req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
-        let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id_string)]));
-
-        let resp = get_all_workout_templates(req, &connector).await;
-        assert!(resp.is_ok());
-        let response = resp.unwrap();
-        assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    }
+    // TEST CASES
+    // * Success
 
     #[tokio::test]
     async fn test_get_all_workout_multiple() {

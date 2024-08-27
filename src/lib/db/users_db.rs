@@ -10,12 +10,9 @@ use crate::lib::errors::DBError;
 use super::DBConnector;
 
 /// Inserts a new user into the database and returns the inserted user.
-///
-/// This function inserts a new user into the `users` table.
-/// If the insertion is successful, the inserted `User` is returned.
 pub async fn insert_user(new_user: &User, connector: &DBConnector) -> Result<User, DBError> {
-    let mut conn = connector.rds_connection().await?;
 
+    let mut conn = connector.rds_connection().await?;
     diesel::insert_into(users)
         .values(new_user)
         .returning(User::as_returning())
@@ -31,21 +28,16 @@ pub async fn insert_user(new_user: &User, connector: &DBConnector) -> Result<Use
 
 
 /// Returns a user with the corresponding ID, or an error if not found.
-///
-/// This function performs a lookup for a user by its primary key (UUID).
-/// If the user is found, it is returned. Otherwise, an appropriate error
-/// is returned.
 pub async fn lookup_user(user_id: Uuid, connector: &DBConnector) -> Result<User, DBError> {
+ 
     let mut conn = connector.rds_connection().await?;
     let user = users.find(user_id)
         .first::<User>(&mut conn)
         .await
-        .map_err(|error| {
-            if error == Error::NotFound {
-                DBError::ItemNotFound("No user exists with the corresponding id".to_string())
-            } else {
-                DBError::OperationError(error.to_string())
-            }
+        .map_err(|error| match error {
+            Error::NotFound => DBError::ItemNotFound("No user exists with the corresponding id".to_string()),
+            _ => DBError::OperationError(error.to_string())
+                
         })?;
     Ok(user)
 }
@@ -56,8 +48,8 @@ pub async fn lookup_user(user_id: Uuid, connector: &DBConnector) -> Result<User,
 /// This function performs a case-insensitive search in the `users` table,
 /// returning all users whose names begin with the specified t
 pub async fn search_username(term: &str, connector: &DBConnector) -> Result<Vec<User>, DBError> {
+    
     let mut conn = connector.rds_connection().await?;
-
     let pattern = format!("{}%", term);
     users.filter(username.like(pattern))
         .load::<User>(&mut conn)
@@ -70,6 +62,11 @@ mod tests {
     use super::*;
     use crate::lib::utils::tests::{pg_container, insert_helper, Items};
 
+    // TEST CASES
+    // * Insert and lookup user
+    // * Insert with duplicate PK
+    // * Lookup non existing
+    // * Search multiple and none
 
     #[tokio::test]
     async fn test_insert_lookup_user() {

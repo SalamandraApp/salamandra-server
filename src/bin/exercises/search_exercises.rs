@@ -13,13 +13,16 @@ struct ExerciseSearchResult {
     exercises: Vec<Exercise>,
 }
 
+/// Return all exercises with name that matches the given prefix
 pub async fn search_exercises_(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
+    // Check query paramater
     let name = match event.query_string_parameters().first("name") {
         Some(name) => name.to_string(),
         None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Incorrect query parameters"))
     };
 
+    // Search in database
     let search_result = match search_exercises(&name, connector).await {
         Ok(vec) => vec,
         Err(error) => {
@@ -27,6 +30,8 @@ pub async fn search_exercises_(event: Request, connector: &DBConnector) -> Resul
             return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
         }
     };
+
+    // Format and return results
     let result = ExerciseSearchResult { exercises: search_result};
     Ok(build_resp(StatusCode::OK, result))
 }
@@ -38,6 +43,12 @@ mod tests {
     use uuid::Uuid;
     use std::collections::HashMap;
     use salamandra_server::lib::utils::tests::{pg_container, insert_helper, Items};
+
+    // TEST CASES
+    // * Invalid query
+    //      * No query parameters
+    //      * Other parameters
+    // * Search multiple exercises
 
     #[tokio::test]
     async fn test_search_exercises_invalid_query() {

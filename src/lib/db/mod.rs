@@ -2,6 +2,8 @@ pub mod users_db;
 pub mod exercises_db;
 pub mod workout_templates_db;
 pub mod wk_template_elements_db;
+pub mod wk_execution_elements_db;
+pub mod workout_executions_db;
 
 
 use std::env;
@@ -9,7 +11,7 @@ use std::env;
 //  use bb8::Pool;
 //  use diesel_async::pooled_connection::ManagerConfig;
 use diesel_async::AsyncPgConnection;
-use tracing::{error, info};
+use tracing::error;
 
 
 use crate::lib::errors::DBError;
@@ -46,7 +48,6 @@ impl DBConnector {
             .with_root_certificates(root_certs)
             .with_no_client_auth();
         let tls = tokio_postgres_rustls::MakeRustlsConnect::new(rustls_config);
-        info!("HOST, USERNAME = {}, {}", db_hostname, db_username);
         let (client, conn) = tokio_postgres::Config::new()
             .host(&db_hostname)
             .port(port)

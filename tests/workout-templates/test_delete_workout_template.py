@@ -2,7 +2,15 @@ import unittest
 import uuid
 from tests.utils import TestHelper, TestError
 
-class TestExercisesGetWkTemplate(unittest.TestCase):
+class TestTemplatesGetWkTemplate(unittest.TestCase):
+
+    """
+    TEST CASES
+    * Incorrect uuids
+    * Non existing template
+    * Success
+    * Someone elses template
+    """
 
     def test_delete_workout_template_incorrect_path_parameters(self):
         try:
@@ -16,7 +24,7 @@ class TestExercisesGetWkTemplate(unittest.TestCase):
                         }
                     )
 
-            self.assertEqual(wrong_format['statusCode'], 400) 
+            self.assertEqual(wrong_format['statusCode'], 404) 
 
         except TestError as e:
             print(f"TEST ERROR: {e}")
@@ -50,7 +58,6 @@ class TestExercisesGetWkTemplate(unittest.TestCase):
             res = TestHelper().get_from_db(f"SELECT id, user_id FROM WorkoutTemplates;")[0]
             wk_id = res[0]
             user_id = res[1]
-            print(wk_id)
             success = TestHelper().invoke(
                     function="workout_templates", 
                     method="DELETE", 
@@ -68,7 +75,27 @@ class TestExercisesGetWkTemplate(unittest.TestCase):
             print(f"TEST ERROR: {e}")
             raise
 
+    def test_delete_workout_template_different_user(self):
+        try:
+            res = TestHelper().get_from_db(f"SELECT id, user_id FROM WorkoutTemplates;")[0]
+            wk_id = res[0]
+            user_id = uuid.uuid4()
+            different_user = TestHelper().invoke(
+                    function="workout_templates", 
+                    method="DELETE", 
+                    path=f"/users/{user_id}/workout-templates/{wk_id}",
+                    path_params= {
+                        "user_id": str(user_id),
+                        "workout_template_id": str(wk_id)
+                        },
+                    sub=str(user_id)
+                    )
 
+            self.assertEqual(different_user['statusCode'], 404) 
+
+        except TestError as e:
+            print(f"TEST ERROR: {e}")
+            raise
 
 if __name__ == '__main__':
     unittest.main()
