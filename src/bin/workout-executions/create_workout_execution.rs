@@ -83,11 +83,11 @@ pub async fn create_workout_execution(event: Request, connector: &DBConnector) -
     // Check and extract payload
     let body = match event.into_body() {
         Body::Text(body) => body,
-        _ => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid payload")),
+        _ => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid payload: can't extract body")),
     };
     let req: CreateWkExecutionRequest = match serde_json::from_str(&body) {
         Ok(req) => req,
-        Err(_) => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid payload")),
+        Err(_) => return Ok(build_resp(StatusCode::BAD_REQUEST, format!("{}Body doesn't match request{}", BASE_ERROR, DOC_LINK))),
     };
 
     // Check input

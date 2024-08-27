@@ -58,13 +58,14 @@ class TestExecutionsCreateWkExecution(unittest.TestCase):
                 "survey": 0,
                 "elements": [ {
                         "exercise_id": str(ex_id),
+                        "exercise_number": 1,
                         "position": 1,
                         "reps": 1,
                         "set_number": 1,
                         "weight": 1.0,
                         "rest": 0,
                         "super_set": None,
-                        "time": 1.0
+                        "time": 1
                 },]
             }
 
@@ -76,6 +77,7 @@ class TestExecutionsCreateWkExecution(unittest.TestCase):
                     body=body,
                     sub=user_id,
                     )
+            print(f"BODY SUCCESS: {success['body']}")
             self.assertEqual(success['statusCode'], 201)
 
         except TestError as e:
@@ -88,20 +90,20 @@ class TestExecutionsCreateWkExecution(unittest.TestCase):
             res = TestHelper().get_from_db("SELECT id, user_id from WorkoutTemplates;")[0]
             user_id = res[1]
             template_id = res[0]
-            print(f"USER AND TEMPLATE ID: {user_id}, {template_id}")
             body = {
                 "workout_template_id": str(template_id),
                 "date": datetime.now().date().strftime('%Y-%m-%d'),
                 "survey": 0,
                 "elements": [ {
                         "exercise_id": str(ex_id),
+                        "exercise_number": 1,
                         "position": 1,
                         "reps": 1,
                         "set_number": 1,
                         "weight": 1.0,
                         "rest": 0,
                         "super_set": None,
-                        "time": 1.0
+                        "time": 1
                 },]
             }
 
@@ -113,6 +115,8 @@ class TestExecutionsCreateWkExecution(unittest.TestCase):
                     body=body,
                     sub=user_id,
                     )
+            
+            print(f"BODY NOT FOUND: {not_found['body']}")
             self.assertEqual(not_found['statusCode'], 404)
 
         except TestError as e:
