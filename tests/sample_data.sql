@@ -4,8 +4,8 @@ TRUNCATE TABLE WKTemplateElements, WorkoutTemplates, Exercises, Users RESTART ID
 -- Insert users
 INSERT INTO Users (id, username, display_name)
 VALUES
-('514960fe-20d1-7065-d057-0ce841f856be', 'user99', 'User 99'),
-('2169209e-10e1-7064-a06c-59b54e7c3b13', 'vzkz', 'vzkz');
+('f139d0fe-10a1-700d-1247-836eed5e053b', 'pato', 'Pato'),
+('81c9608e-30c1-701c-e7db-f81caa667ea2', 'vzkz', 'vzkz'););
 
 -- Insert exercises
 INSERT INTO Exercises (id, name, main_muscle_group, secondary_muscle_group, necessary_equipment, exercise_type)
@@ -17,8 +17,8 @@ VALUES
 -- Insert workout templates
 INSERT INTO WorkoutTemplates (id, user_id, name, description, date_created)
 VALUES
-(gen_random_uuid(), (SELECT id FROM Users WHERE username = 'user99'), 'Workout A', '', CURRENT_DATE),
-(gen_random_uuid(), (SELECT id FROM Users WHERE username = 'user99'), 'Workout B', '', CURRENT_DATE),
+(gen_random_uuid(), (SELECT id FROM Users WHERE username = 'pato'), 'Workout A', '', CURRENT_DATE),
+(gen_random_uuid(), (SELECT id FROM Users WHERE username = 'pato'), 'Workout B', '', CURRENT_DATE),
 (gen_random_uuid(), (SELECT id FROM Users WHERE username = 'vzkz'), 'Workout C', '', CURRENT_DATE),
 (gen_random_uuid(), (SELECT id FROM Users WHERE username = 'vzkz'), 'Workout D', '', CURRENT_DATE);
 
