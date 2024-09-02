@@ -417,7 +417,7 @@ mod tests {
                 if let Body::Text(body) = response.into_body() {
                     let body_string: String = body;
                     let unescaped_body = serde_json::from_str::<String>(&body_string).unwrap();
-                    assert_eq!(unescaped_body, format!("{}All sets, reps and weight (if not none) must be at least 1. No values can't be negative{}", BASE_ERROR, DOC_LINK));
+                    assert_eq!(unescaped_body, format!("{}All sets and reps must be at least 1. No values can't be negative{}", BASE_ERROR, DOC_LINK));
                 }
             }
         }
