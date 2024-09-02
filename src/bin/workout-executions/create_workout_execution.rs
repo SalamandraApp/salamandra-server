@@ -169,8 +169,8 @@ fn validate_execution(items: &[WkExecutionElementRequest]) -> Result<(), String>
     }
 
     // Values over 0
-    if items.iter().any(|item| item.reps <= 0 || item.exercise_number <= 0 || item.set_number <= 0 || item.weight.map_or(false, |w| w <= 0.0) || item.rest < 0 || item.time <= 0) {
-        return Err(format!("{}All reps, set_number, weight (if not none) and time values must be at least 1. No values can't be negative{}", BASE_ERROR, DOC_LINK));
+    if items.iter().any(|item| item.reps <= 0 || item.exercise_number <= 0 || item.set_number <= 0 || item.weight.map_or(false, |w| w < 0.0) || item.rest < 0 || item.time <= 0) {
+        return Err(format!("{}All reps, set_number and time values must be at least 1. No values can't be negative{}", BASE_ERROR, DOC_LINK));
     }
 
     // POSITION
