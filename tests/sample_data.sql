@@ -25,21 +25,21 @@ VALUES
 -- Insert workout template elements
 INSERT INTO WKTemplateElements (id, workout_template_id, exercise_id, position, reps, sets, weight, rest, super_set)
 VALUES
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout A'), (SELECT id FROM Exercises WHERE name = 'Push Up'),  1, 6, 4, 50, 50, NULL),
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout A'), (SELECT id FROM Exercises WHERE name = 'Pull Up'),  2, 6, 3, 50, 60, NULL),
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout A'), (SELECT id FROM Exercises WHERE name = 'Squat'),    3, 6, 7, 50, 60, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout A'), (SELECT id FROM Exercises WHERE name = 'Push Up'),  0, 6, 4, 50, 50, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout A'), (SELECT id FROM Exercises WHERE name = 'Pull Up'),  1, 6, 3, 50, 60, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout A'), (SELECT id FROM Exercises WHERE name = 'Squat'),    2, 6, 7, 50, 60, NULL),
 
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout B'), (SELECT id FROM Exercises WHERE name = 'Push Up'),  1, 6, 4, 50, 60, NULL),
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout B'), (SELECT id FROM Exercises WHERE name = 'Pull Up'),  2, 6, 4, 50, 60, NULL),
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout B'), (SELECT id FROM Exercises WHERE name = 'Squat'),    3, 6, 4, 50, 60, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout B'), (SELECT id FROM Exercises WHERE name = 'Push Up'),  0, 6, 4, 50, 60, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout B'), (SELECT id FROM Exercises WHERE name = 'Pull Up'),  1, 6, 4, 50, 60, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout B'), (SELECT id FROM Exercises WHERE name = 'Squat'),    2, 6, 4, 50, 60, NULL),
 
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout C'), (SELECT id FROM Exercises WHERE name = 'Push Up'),  1, 6, 4, 30, 60, NULL),
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout C'), (SELECT id FROM Exercises WHERE name = 'Pull Up'),  2, 6, 4, 50, 100, NULL),
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout C'), (SELECT id FROM Exercises WHERE name = 'Squat'),    3, 12, 4, 50, 60, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout C'), (SELECT id FROM Exercises WHERE name = 'Push Up'),  0, 6, 4, 30, 60, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout C'), (SELECT id FROM Exercises WHERE name = 'Pull Up'),  1, 6, 4, 50, 100, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout C'), (SELECT id FROM Exercises WHERE name = 'Squat'),    2, 12, 4, 50, 60, NULL),
 
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout D'), (SELECT id FROM Exercises WHERE name = 'Push Up'),  1, 6, 4, 50, 60, NULL),
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout D'), (SELECT id FROM Exercises WHERE name = 'Pull Up'),  2, 12, 4, 20, 60, NULL),
-(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout D'), (SELECT id FROM Exercises WHERE name = 'Squat'),    3, 4, 4, 50, 90, NULL);
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout D'), (SELECT id FROM Exercises WHERE name = 'Push Up'),  0, 6, 4, 50, 60, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout D'), (SELECT id FROM Exercises WHERE name = 'Pull Up'),  1, 12, 4, 20, 60, NULL),
+(gen_random_uuid(), (SELECT id FROM WorkoutTemplates WHERE name = 'Workout D'), (SELECT id FROM Exercises WHERE name = 'Squat'),    2, 4, 4, 50, 90, NULL);
 
 -- Insert workout templates
 INSERT INTO WorkoutExecutions(id, workout_template_id, date, survey)
