@@ -169,15 +169,15 @@ fn validate_execution(items: &[WkExecutionElementRequest]) -> Result<(), String>
     }
 
     // Values over 0
-    if items.iter().any(|item| item.reps <= 0 || item.exercise_number <= 0 || item.set_number <= 0 || item.weight.map_or(false, |w| w < 0.0) || item.rest < 0 || item.time <= 0) {
-        return Err(format!("{}All reps, set_number and time values must be at least 1. No values can't be negative{}", BASE_ERROR, DOC_LINK));
+    if items.iter().any(|item| item.reps <= 0 || item.exercise_number < 0 || item.set_number < 0 || item.weight.map_or(false, |w| w < 0.0) || item.rest < 0 || item.time <= 0) {
+        return Err(format!("{}All reps and time values must be at least 1. No values can't be negative{}", BASE_ERROR, DOC_LINK));
     }
 
     // POSITION
     let mut positions: Vec<i16> = items.iter().map(|item| item.position).collect();
     positions.sort_unstable();
-    if positions != (1..=items.len() as i16).collect::<Vec<_>>() { 
-        return Err(format!("{}The element's positions must be sequential, starting from 1{}", BASE_ERROR, DOC_LINK));
+    if positions != (0..items.len() as i16).collect::<Vec<_>>() { 
+        return Err(format!("{}The element's positions must be sequential, starting from 0{}", BASE_ERROR, DOC_LINK));
     }
 
     // EXERCISE NUMBER
@@ -189,9 +189,9 @@ fn validate_execution(items: &[WkExecutionElementRequest]) -> Result<(), String>
     unique_exercise_numbers.sort_unstable();
 
     if unique_exercise_numbers.is_empty() || 
-        unique_exercise_numbers[0] != 1 || 
+        unique_exercise_numbers[0] != 0 || 
             unique_exercise_numbers.windows(2).any(|w| w[1] - w[0] > 1) {
-                return Err(format!("{}The element's exercise_number must be sequential, starting from 1 (repetitions allowed){}", BASE_ERROR, DOC_LINK));
+                return Err(format!("{}The element's exercise_number must be sequential, starting from 0 (repetitions allowed){}", BASE_ERROR, DOC_LINK));
     }
 
     // SET NUMBER
@@ -220,7 +220,7 @@ fn validate_execution(items: &[WkExecutionElementRequest]) -> Result<(), String>
         .any(|(_, group)| {
             let sorted_group = group.iter().sorted_by_key(|item| item.position);
             let set_numbers: Vec<i16> = sorted_group.map(|item| item.set_number).collect();
-            let expected: Vec<i16> = (1..=set_numbers.len() as i16).collect();
+            let expected: Vec<i16> = (0..set_numbers.len() as i16).collect();
             set_numbers != expected
         });
     if invalid_exercise {
@@ -240,9 +240,9 @@ fn validate_execution(items: &[WkExecutionElementRequest]) -> Result<(), String>
     unique_super_set_values.sort_unstable();
 
     if !unique_super_set_values.is_empty() && 
-        (unique_super_set_values[0] != 1 || 
+        (unique_super_set_values[0] != 0 || 
          unique_super_set_values.windows(2).any(|w| w[1] - w[0] > 1)) {
-            return Err(format!("{}The non-null super_set values must be sequential, starting from 1 with repetitions{}", BASE_ERROR, DOC_LINK));
+            return Err(format!("{}The non-null super_set values must be sequential, starting from 0 with repetitions{}", BASE_ERROR, DOC_LINK));
     }
 
     // Super set group
@@ -288,8 +288,8 @@ mod tests {
         let base_element = WkExecutionElementRequest {
             exercise_id,
             position: 0,
-            set_number: 1,
-            exercise_number: 1,
+            set_number: 0,
+            exercise_number: 0,
             reps: 1,
             weight: Some(1.0),
             rest: 0,
@@ -301,7 +301,7 @@ mod tests {
 
         // Update positions
         for (index, element) in elements.iter_mut().enumerate() {
-            element.position = (index + 1) as i16;
+            element.position = index as i16;
         };
 
         let execution = CreateWkExecutionRequest {
@@ -320,31 +320,31 @@ mod tests {
         let jwt = test_jwt(user_id);
 
         // 3 x exercise 1
-        payload.elements[0].exercise_number = 1;
-        payload.elements[1].exercise_number = 1;
-        payload.elements[2].exercise_number = 1;
-        payload.elements[0].set_number = 1;
-        payload.elements[1].set_number = 2;
-        payload.elements[2].set_number = 3;
+        payload.elements[0].exercise_number = 0;
+        payload.elements[1].exercise_number = 0;
+        payload.elements[2].exercise_number = 0;
+        payload.elements[0].set_number = 0;
+        payload.elements[1].set_number = 1;
+        payload.elements[2].set_number = 2;
 
 
         // Super set {
         //      3 x exercise 2
         //      2 x exercise 3
         // }
-        payload.elements[3].exercise_number = 2;
-        payload.elements[4].exercise_number = 3;
-        payload.elements[5].exercise_number = 2;
-        payload.elements[6].exercise_number = 3;
-        payload.elements[7].exercise_number = 2;
+        payload.elements[3].exercise_number = 1;
+        payload.elements[4].exercise_number = 2;
+        payload.elements[5].exercise_number = 1;
+        payload.elements[6].exercise_number = 2;
+        payload.elements[7].exercise_number = 1;
 
-        payload.elements[3].set_number = 1;
-        payload.elements[4].set_number = 1;
-        payload.elements[5].set_number = 2;
-        payload.elements[6].set_number = 2;
-        payload.elements[7].set_number = 3;
+        payload.elements[3].set_number = 0;
+        payload.elements[4].set_number = 0;
+        payload.elements[5].set_number = 1;
+        payload.elements[6].set_number = 1;
+        payload.elements[7].set_number = 2;
         payload.elements[3..=7].iter_mut().for_each(|item| {
-            item.super_set = Some(1);
+            item.super_set = Some(0);
         });
 
         let mut req = Request::default();
@@ -395,9 +395,9 @@ mod tests {
             let (user_id, mut payload) = setup_execution(&connector, 3).await;
             let jwt = test_jwt(user_id);
 
-            payload.elements[0].set_number = 1;
-            payload.elements[1].set_number = 3; // switched around
-            payload.elements[2].set_number = 2;
+            payload.elements[0].set_number = 0;
+            payload.elements[1].set_number = 2; // switched around
+            payload.elements[2].set_number = 1;
 
 
             let mut req = Request::default();
@@ -422,15 +422,15 @@ mod tests {
             let (user_id, mut payload) = setup_execution(&connector, 4).await;
             let jwt = test_jwt(user_id);
 
-            payload.elements[0].exercise_number = 1;
-            payload.elements[1].exercise_number = 2;
-            payload.elements[2].exercise_number = 2;
-            payload.elements[3].exercise_number = 3;
+            payload.elements[0].exercise_number = 0;
+            payload.elements[1].exercise_number = 1;
+            payload.elements[2].exercise_number = 1;
+            payload.elements[3].exercise_number = 2;
             
-            payload.elements[0].set_number = 1;
-            payload.elements[1].set_number = 1;
-            payload.elements[2].set_number = 2;
-            payload.elements[3].set_number = 1;
+            payload.elements[0].set_number = 0;
+            payload.elements[1].set_number = 0;
+            payload.elements[2].set_number = 1;
+            payload.elements[3].set_number = 0;
 
             payload.elements[0..=3].iter_mut().for_each(|item| {
                 item.super_set = Some(1);
@@ -461,9 +461,9 @@ mod tests {
             let (user_id, mut payload) = setup_execution(&connector, 3).await;
             let jwt = test_jwt(user_id);
 
-            payload.elements[0].exercise_number = 2;
-            payload.elements[1].exercise_number = 3;
-            payload.elements[2].exercise_number = 4;
+            payload.elements[0].exercise_number = 1;
+            payload.elements[1].exercise_number = 2;
+            payload.elements[2].exercise_number = 3;
 
 
             let mut req = Request::default();
@@ -480,7 +480,7 @@ mod tests {
             if let Body::Text(body) = response.into_body() {
                 let body_string: String = body;
                 let unescaped_body = serde_json::from_str::<String>(&body_string).unwrap();
-                assert_eq!(unescaped_body, format!("{}The element's exercise_number must be sequential, starting from 1 (repetitions allowed){}", BASE_ERROR, DOC_LINK));
+                assert_eq!(unescaped_body, format!("{}The element's exercise_number must be sequential, starting from 0 (repetitions allowed){}", BASE_ERROR, DOC_LINK));
             }
         }     
 
@@ -489,8 +489,8 @@ mod tests {
             let jwt = test_jwt(user_id);
 
             payload.elements[0].exercise_number = -1;
-            payload.elements[1].exercise_number = 3;
-            payload.elements[2].exercise_number = 4;
+            payload.elements[1].exercise_number = 0;
+            payload.elements[2].exercise_number = 1;
 
             let mut req = Request::default();
             req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
@@ -506,7 +506,7 @@ mod tests {
             if let Body::Text(body) = response.into_body() {
                 let body_string: String = body;
                 let unescaped_body = serde_json::from_str::<String>(&body_string).unwrap();
-                assert_eq!(unescaped_body, format!("{}All reps, set_number and time values must be at least 1. No values can't be negative{}", BASE_ERROR, DOC_LINK));
+                assert_eq!(unescaped_body, format!("{}All reps and time values must be at least 1. No values can't be negative{}", BASE_ERROR, DOC_LINK));
             }
         }   
     }
@@ -517,15 +517,15 @@ mod tests {
             let (user_id, mut payload) = setup_execution(&connector, 4).await;
             let jwt = test_jwt(user_id);
 
-            payload.elements[0].exercise_number = 1;
-            payload.elements[1].exercise_number = 2;
-            payload.elements[2].exercise_number = 3;
-            payload.elements[3].exercise_number = 4;
+            payload.elements[0].exercise_number = 0;
+            payload.elements[1].exercise_number = 1;
+            payload.elements[2].exercise_number = 2;
+            payload.elements[3].exercise_number = 3;
             
-            payload.elements[0].super_set = Some(1);
-            payload.elements[1].super_set = Some(1);
-            payload.elements[2].super_set = Some(3); // Should be 2
-            payload.elements[3].super_set = Some(3);
+            payload.elements[0].super_set = Some(0);
+            payload.elements[1].super_set = Some(0);
+            payload.elements[2].super_set = Some(2); // Should be 1
+            payload.elements[3].super_set = Some(2);
 
             let mut req = Request::default();
             req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
@@ -541,7 +541,7 @@ mod tests {
             if let Body::Text(body) = response.into_body() {
                 let body_string: String = body;
                 let unescaped_body = serde_json::from_str::<String>(&body_string).unwrap();
-                assert_eq!(unescaped_body, format!("{}The non-null super_set values must be sequential, starting from 1 with repetitions{}", BASE_ERROR, DOC_LINK));
+                assert_eq!(unescaped_body, format!("{}The non-null super_set values must be sequential, starting from 0 with repetitions{}", BASE_ERROR, DOC_LINK));
             }
         }     
 
@@ -549,12 +549,12 @@ mod tests {
             let (user_id, mut payload) = setup_execution(&connector, 2).await;
             let jwt = test_jwt(user_id);
 
-            payload.elements[0].exercise_number = 1;
-            payload.elements[1].exercise_number = 1;
-            payload.elements[1].set_number = 2;
+            payload.elements[0].exercise_number = 0;
+            payload.elements[1].exercise_number = 0;
+            payload.elements[1].set_number = 1;
             
-            payload.elements[0].super_set = Some(1); // Cant be same exercise number
-            payload.elements[1].super_set = Some(1);
+            payload.elements[0].super_set = Some(0); // Cant be same exercise number
+            payload.elements[1].super_set = Some(0);
 
             let mut req = Request::default();
             req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
@@ -577,12 +577,12 @@ mod tests {
             let (user_id, mut payload) = setup_execution(&connector, 3).await;
             let jwt = test_jwt(user_id);
 
-            payload.elements[0].exercise_number = 1;
-            payload.elements[1].exercise_number = 2;
-            payload.elements[2].exercise_number = 3;
+            payload.elements[0].exercise_number = 0;
+            payload.elements[1].exercise_number = 1;
+            payload.elements[2].exercise_number = 2;
 
-            payload.elements[0].super_set = Some(1); 
-            payload.elements[2].super_set = Some(1); // Cant have non consecutive rows in the same
+            payload.elements[0].super_set = Some(0); 
+            payload.elements[2].super_set = Some(0); // Cant have non consecutive rows in the same
                                                      // super set
 
             let mut req = Request::default();

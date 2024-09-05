@@ -56,7 +56,7 @@ class TestTemplatesCreateWkTemplate(unittest.TestCase):
                 "date_created": datetime.now().date().strftime('%Y-%m-%d'),
                 "elements": [ {
                         "exercise_id": str(ex_id),
-                        "position": 1,
+                        "position": 0,
                         "reps": 1,
                         "sets": 1,
                         "weight": 1.0,
@@ -89,7 +89,7 @@ class TestTemplatesCreateWkTemplate(unittest.TestCase):
                 "date_created": datetime.now().date().strftime('%Y-%m-%d'),
                 "elements": [ {
                         "exercise_id": str(ex_id), 
-                        "position": 1,
+                        "position": 0,
                         "reps": 1,
                         "sets": 1,
                         "weight": 1.0,
