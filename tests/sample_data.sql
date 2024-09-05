@@ -5,7 +5,7 @@ TRUNCATE TABLE WKTemplateElements, WorkoutTemplates, Exercises, Users RESTART ID
 INSERT INTO Users (id, username, display_name)
 VALUES
 ('f139d0fe-10a1-700d-1247-836eed5e053b', 'pato', 'Pato'),
-('81c9608e-30c1-701c-e7db-f81caa667ea2', 'vzkz', 'vzkz'););
+('81c9608e-30c1-701c-e7db-f81caa667ea2', 'vzkz', 'vzkz');
 
 -- Insert exercises
 INSERT INTO Exercises (id, name, main_muscle_group, secondary_muscle_group, necessary_equipment, exercise_type)

@@ -174,8 +174,8 @@ fn validate_template(items: &[WkTemplateElementRequest]) -> Result<(), String> {
     // Sequential position 
     let mut positions: Vec<i16> = items.iter().map(|item| item.position).collect();
     positions.sort_unstable();
-    if positions != (1..=items.len() as i16).collect::<Vec<_>>() { 
-        return Err(format!("{}The element's positions must be sequential, starting from 1{}", BASE_ERROR, DOC_LINK));
+    if positions != (0..items.len() as i16).collect::<Vec<_>>() { 
+        return Err(format!("{}The element's positions must be sequential, starting from 0{}", BASE_ERROR, DOC_LINK));
     }
 
     // Group by superset
@@ -197,9 +197,9 @@ fn validate_template(items: &[WkTemplateElementRequest]) -> Result<(), String> {
     unique_super_set_values.sort_unstable();
 
     if !unique_super_set_values.is_empty() && 
-        (unique_super_set_values[0] != 1 || 
+        (unique_super_set_values[0] != 0 || 
          unique_super_set_values.windows(2).any(|w| w[1] - w[0] > 1)) {
-            return Err(format!("{}The non-null super_set values must be sequential, starting from 1 with repetitions{}", BASE_ERROR, DOC_LINK));
+            return Err(format!("{}The non-null super_set values must be sequential, starting from 0 with repetitions{}", BASE_ERROR, DOC_LINK));
     }
 
     // Super set group
@@ -241,7 +241,7 @@ mod tests {
 
         let base_element = WkTemplateElementRequest {
             exercise_id,
-            position: 1,  // We'll update this later
+            position: 0,  
             reps: 1,
             sets: 1,
             weight: Some(1.0),
@@ -253,7 +253,7 @@ mod tests {
 
         // Update positions
         for (index, element) in elements.iter_mut().enumerate() {
-            element.position = (index + 1) as i16;
+            element.position = index as i16;
         }
 
         let template = CreateWkTemplateRequest {
@@ -271,10 +271,10 @@ mod tests {
         let (user_id, mut payload) = setup_template(&connector).await;
         let jwt = test_jwt(user_id);
 
-        payload.elements[0].super_set = Some(1);
-        payload.elements[1].super_set = Some(1);
-        payload.elements[2].super_set = Some(2);
-        payload.elements[3].super_set = Some(2);
+        payload.elements[0].super_set = Some(0);
+        payload.elements[1].super_set = Some(0);
+        payload.elements[2].super_set = Some(1);
+        payload.elements[3].super_set = Some(1);
 
         let mut req = Request::default();
         req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
@@ -440,8 +440,8 @@ mod tests {
         payload2.elements[2].position = 8;
         payload2.elements[3].position = 3;
 
-        payload3.elements[0].position = 0;
-        payload3.elements[1].position = 1;
+        payload3.elements[0].position = 1;
+        payload3.elements[1].position = 2;
         payload3.elements[2].position = 3;
         payload3.elements[3].position = 4;
 
@@ -470,7 +470,7 @@ mod tests {
             if let Body::Text(body) = response.into_body() {
                 let body_string: String = body;
                 let unescaped_body = serde_json::from_str::<String>(&body_string).unwrap();
-                assert_eq!(unescaped_body, format!("{}The element's positions must be sequential, starting from 1{}", BASE_ERROR, DOC_LINK));
+                assert_eq!(unescaped_body, format!("{}The element's positions must be sequential, starting from 0{}", BASE_ERROR, DOC_LINK));
             }
         }
     }
@@ -483,17 +483,17 @@ mod tests {
         let (user_id3, mut payload3) = setup_template(&connector).await;
 
         // Not sequential super set id
-        payload1.elements[0].super_set = Some(1);
-        payload1.elements[1].super_set = Some(1);
-        payload1.elements[2].super_set = Some(3);
-        payload1.elements[3].super_set = Some(3);
+        payload1.elements[0].super_set = Some(0);
+        payload1.elements[1].super_set = Some(0);
+        payload1.elements[2].super_set = Some(2);
+        payload1.elements[3].super_set = Some(2);
 
         // Only 1 exercise in superset
-        payload2.elements[0].super_set = Some(1);
+        payload2.elements[0].super_set = Some(0);
 
         // Not sequential in superset
-        payload3.elements[0].super_set = Some(1);
-        payload3.elements[2].super_set = Some(1);
+        payload3.elements[0].super_set = Some(0);
+        payload3.elements[2].super_set = Some(0);
 
         let jwt1 = test_jwt(user_id1);
         let jwt2 = test_jwt(user_id2);
@@ -505,7 +505,7 @@ mod tests {
             (user_id3, jwt3, payload3),
         ];
         let responses = vec![
-            format!("{}The non-null super_set values must be sequential, starting from 1 with repetitions{}", BASE_ERROR, DOC_LINK),
+            format!("{}The non-null super_set values must be sequential, starting from 0 with repetitions{}", BASE_ERROR, DOC_LINK),
             format!("{}There must be at least 2 elements per super set group{}", BASE_ERROR, DOC_LINK),
             format!("{}In each super_set group all position values must be sequential{}", BASE_ERROR, DOC_LINK)
         ];
