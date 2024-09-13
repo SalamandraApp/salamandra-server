@@ -4,7 +4,7 @@ use diesel_async::RunQueryDsl;
 use uuid::Uuid;
 
 use crate::schema::users::dsl::*;
-use crate::lib::models::user_models::User;
+use crate::lib::models::user_models::{UncompleteUser, User};
 use crate::lib::errors::DBError;
 
 use super::DBConnector;
@@ -15,7 +15,6 @@ pub async fn insert_user(new_user: &User, connector: &DBConnector) -> Result<Use
     let mut conn = connector.rds_connection().await?;
     diesel::insert_into(users)
         .values(new_user)
-        .returning(User::as_returning())
         .get_result(&mut conn)
         .await
         .map_err(|error| match error {
@@ -26,6 +25,28 @@ pub async fn insert_user(new_user: &User, connector: &DBConnector) -> Result<Use
         })
 }
 
+/// Update given values for an already existing user
+pub async fn update_user(user_id: &Uuid, user: &UncompleteUser, connector: &DBConnector) -> Result<User, DBError> {
+
+    let mut conn = connector.rds_connection().await?;
+    let user = diesel::update(users.filter(id.eq(user_id)))
+        .set(user)
+        .get_result(&mut conn)
+        .await
+        .map_err(|error| match error {
+            Error::NotFound => {
+                DBError::ItemNotFound("No user exists with the corresponding id".to_string())
+            },
+            Error::QueryBuilderError(_) => {
+                DBError::QueryError(error.to_string())
+            },
+            _ => {
+                DBError::OperationError(error.to_string())
+            }
+                
+        })?;
+    Ok(user)
+}
 
 /// Returns a user with the corresponding ID, or an error if not found.
 pub async fn lookup_user(user_id: Uuid, connector: &DBConnector) -> Result<User, DBError> {
@@ -138,5 +159,37 @@ mod tests {
 
         let vec = search_res.unwrap();
         assert_eq!(vec.len(), 0, "Should have been 0 users");
+    }
+
+    #[tokio::test]
+    async fn test_update_user_new() {
+        let (connector, _container) = pg_container().await;
+
+        // Create a new user object to insert
+        let new_uncomplete_user = UncompleteUser{..Default::default()};
+
+        let update_res = update_user(&Uuid::new_v4(), &new_uncomplete_user, &connector).await;
+        assert!(update_res.is_err());
+    }
+    
+    #[tokio::test]
+    async fn test_update_user_success() {
+        let (connector, _container) = pg_container().await;
+
+        // Create a new user object to insert
+        let user_id = Uuid::new_v4();
+        let name = "username";
+        let display = "NEW";
+        let new_user = User{id: user_id.clone(), username: name.to_string(), ..Default::default()};
+        let expected_user = User{id: user_id.clone(), username: name.to_string(), display_name: display.to_string(), ..Default::default()};
+        let new_uncomplete_user = UncompleteUser{
+            display_name: Some(display.to_string()), 
+            ..Default::default()};
+
+        let insert_res = insert_user(&new_user, &connector).await;
+        assert!(insert_res.is_ok());
+        let update_res = update_user(&user_id, &new_uncomplete_user, &connector).await;
+        assert!(update_res.is_ok());
+        assert_eq!(update_res.unwrap(), expected_user);
     }
 }

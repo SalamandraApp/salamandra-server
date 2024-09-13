@@ -34,3 +34,30 @@ impl Default for User {
         }
     }
 }
+
+#[derive(Insertable, Serialize, Deserialize, Clone, Debug, PartialEq, AsChangeset)]
+#[diesel(table_name = users)]
+pub struct UncompleteUser {
+    // USERNAME cannot be changed
+    pub display_name: Option<String>,
+    pub date_joined: Option<NaiveDate>,
+    pub date_of_birth: Option<NaiveDate>,
+    pub height: Option<i16>,
+    pub weight: Option<f32>,
+    pub gender: Option<i16>,
+    pub fitness_goal: Option<i16>,
+    pub fitness_level: Option<i16>,
+} impl Default for UncompleteUser{
+    fn default() -> Self {
+        UncompleteUser {
+            display_name: None,
+            date_joined: None,
+            date_of_birth: None,
+            height: None,
+            weight: None,
+            gender: None,
+            fitness_goal: None,
+            fitness_level: None,
+        }
+    }
+}
