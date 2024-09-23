@@ -2,7 +2,14 @@ import unittest
 import json
 from tests.utils import TestHelper, TestError
 
-class TestExercisesSearchUsers(unittest.TestCase):
+class TestUsersSearchUsers(unittest.TestCase):
+
+    """
+    TEST CASES
+    * No query parameter
+    * No exercises match
+    * Multiple match
+    """
 
     def test_search_user_incorrect_query_parameters(self):
         try:

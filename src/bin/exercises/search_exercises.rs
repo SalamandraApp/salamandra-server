@@ -1,30 +1,37 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt};
 use lambda_http::http::StatusCode;
-use salamandra_server::lib::errors::DBError;
 use serde::{Deserialize, Serialize};
 
 use salamandra_server::lib::db::exercises_db::search_exercises;
 use salamandra_server::lib::utils::handlers::build_resp;
-use salamandra_server::lib::db::DBPool;
+use salamandra_server::lib::db::DBConnector;
 use salamandra_server::lib::models::exercise_models::Exercise;
+use tracing::error;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ExerciseSearchResult {
     exercises: Vec<Exercise>,
 }
 
-pub async fn search_exercises_(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
+/// Return all exercises with name that matches the given prefix
+pub async fn search_exercises_(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
+    // Check query paramater
     let name = match event.query_string_parameters().first("name") {
         Some(name) => name.to_string(),
         None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Incorrect query parameters"))
     };
 
-    let search_result = match search_exercises(&name, test_db).await {
+    // Search in database
+    let search_result = match search_exercises(&name, connector).await {
         Ok(vec) => vec,
-        Err(DBError::ConnectionError(ref mes)) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, mes)),
-        Err(_) => return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+        Err(error) => {
+            error!("INTERNAL SERVER ERROR: {}", error);
+            return Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     };
+
+    // Format and return results
     let result = ExerciseSearchResult { exercises: search_result};
     Ok(build_resp(StatusCode::OK, result))
 }
@@ -37,13 +44,19 @@ mod tests {
     use std::collections::HashMap;
     use salamandra_server::lib::utils::tests::{pg_container, insert_helper, Items};
 
+    // TEST CASES
+    // * Invalid query
+    //      * No query parameters
+    //      * Other parameters
+    // * Search multiple exercises
+
     #[tokio::test]
     async fn test_search_exercises_invalid_query() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         { // ------ No query parameters
             let req_ = Request::default();
-
-            let resp = search_exercises_(req_, Some(pool.clone())).await;
+            
+            let resp = search_exercises_(req_, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -55,7 +68,7 @@ mod tests {
             query_params.insert("not_username".to_string(), "Test".to_string());
             let req = req_.with_query_string_parameters(query_params);
 
-            let resp = search_exercises_(req, Some(pool.clone())).await;
+            let resp = search_exercises_(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -64,15 +77,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_exercises_ok() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let req_ = Request::default();
 
         let mut query_params = HashMap::new();
         query_params.insert("name".to_string(), "Test".to_string());
         let req = req_.with_query_string_parameters(query_params);
     
-        let exercise_ids = insert_helper(5, Items::Exercises, pool.clone(), Some("Test".into())).await;
-        let resp = search_exercises_(req, Some(pool)).await;
+        let exercise_ids = insert_helper(5, Items::Exercises, &connector, Some("Test".into())).await;
+        let resp = search_exercises_(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::OK);

@@ -69,7 +69,7 @@ class TestHelper:
 
     def __init__(self):
         self.http_methods = ["GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"]
-        self.available_functions = ["users", "exercises", "workout_templates"]
+        self.available_functions = ["users", "exercises", "workout_templates", "workout_executions"]
         self.cursor = self.__initiate_sql()
         self._template = {
                 "path": "",

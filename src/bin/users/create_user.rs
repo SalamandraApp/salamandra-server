@@ -1,12 +1,13 @@
 use lambda_http::{Error, Request, Response, Body};
 use lambda_http::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use tracing::{error, warn};
 use uuid::Uuid;
 use chrono::NaiveDate;
 
 use salamandra_server::lib::models::user_models::User;
 use salamandra_server::lib::db::users_db::insert_user;
-use salamandra_server::lib::db::DBPool;
+use salamandra_server::lib::db::DBConnector;
 use salamandra_server::lib::errors::DBError;
 use salamandra_server::lib::utils::handlers::{build_resp, extract_sub};
 
@@ -17,24 +18,38 @@ struct CreateUserRequest {
     date_joined: NaiveDate,
 }
 
-pub async fn create_user(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
+/// Insert user after it has been registered in cognito
+pub async fn create_user(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
+    // Format request
     if let Body::Text(body) = event.clone().into_body() {
         if let Ok(req) = serde_json::from_str::<CreateUserRequest>(&body) {
+
+            // Check the user is creating themselves, not someone else
             match extract_sub(event.headers(), Some(req.uuid)) {
                 Ok(_) => (),
                 Err(resp) => return Ok(resp)
             };
+
+            // Create user with Cognito UUID
             let new_user = User {
                 id: req.uuid,
                 username: req.username,
                 date_joined: req.date_joined,
                 ..Default::default()
             };
-            let resp = match insert_user(&new_user, test_db).await {
+
+            // Insert in database
+            let resp = match insert_user(&new_user, connector).await {
                 Ok(user) => build_resp(StatusCode::CREATED, user),
-                Err(DBError::UniqueViolation(mes)) => build_resp(StatusCode::CONFLICT, mes),
-                Err(_) => build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""),
+                Err(DBError::UniqueViolation(mes)) => {
+                    warn!("Tried to insert already exisiting user");
+                    build_resp(StatusCode::CONFLICT, mes)
+                },
+                Err(error) => {
+                    error!("INTERNAL SERVER ERROR: {}", error);
+                    build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")
+                }
             };
             return Ok(resp);
         }
@@ -65,10 +80,17 @@ mod tests {
         date_joined: String,
     }
 
+    // TEST CASES
+    // * Invalid payload
+    //      * Different fields
+    //      * Fields with different types
+    //      * No payload
+    // * Successfully create user
+    // * Try to create existing user
 
     #[tokio::test]
     async fn test_create_user_invalid_payload() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let user_id = Uuid::new_v4();
 
         {   // ------ Different fields
@@ -79,7 +101,7 @@ mod tests {
             req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
             *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
 
-            let resp = create_user(req, Some(pool.clone())).await;
+            let resp = create_user(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -97,7 +119,7 @@ mod tests {
             req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
             *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
 
-            let resp = create_user(req, Some(pool.clone())).await;
+            let resp = create_user(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -108,7 +130,7 @@ mod tests {
             let mut req = Request::default();
             let jwt = test_jwt(user_id);
             req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
-            let resp = create_user(req, Some(pool)).await;
+            let resp = create_user(req, &connector).await;
             assert!(resp.is_ok());
             let response = resp.unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -117,7 +139,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_create_user_existing() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let user_id = Uuid::new_v4();
         let payload = CreateUserRequest {
             uuid: user_id,
@@ -130,12 +152,12 @@ mod tests {
         req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
         *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
         
-        let resp = create_user(req.clone(), Some(pool.clone())).await;
+        let resp = create_user(req.clone(), &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::CREATED);
 
-        let resp = create_user(req, Some(pool)).await;
+        let resp = create_user(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::CONFLICT);
@@ -144,7 +166,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_create_user_new() {        
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let user_id = Uuid::new_v4();
         let payload = CreateUserRequest {
             uuid: user_id,
@@ -157,7 +179,7 @@ mod tests {
         req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&jwt).unwrap());
         *req.body_mut() = Body::from(to_string(&payload).expect("Error"));
         
-        let resp = create_user(req, Some(pool)).await;
+        let resp = create_user(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::CREATED);

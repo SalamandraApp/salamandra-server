@@ -1,10 +1,14 @@
 mod create_user;
 mod get_user;
 mod search_users;
+mod patch_user;
 
 use get_user::get_user;
 use create_user::create_user;
 use search_users::search_users;
+use patch_user::patch_user;
+use salamandra_server::lib::utils::handlers::{not_found, UUID_PATTERN};
+use salamandra_server::lib::db::DBConnector;
 
 use lambda_http::{run, service_fn, Error, Request, Response, Body, tracing};
 use lambda_http::http::Method;
@@ -19,17 +23,14 @@ async fn main() -> Result<(), Error> {
 
 async fn router(event: Request) -> Result<Response<Body>, Error> {
     let path = event.uri().path();
+    let connector = DBConnector::default();
+    let specific_user = Regex::new(&format!(r"^/users/{}$", UUID_PATTERN));
     let response = match (event.method(), path) {
-        (&Method::GET, _) if Regex::new(r"^/users/[a-fA-F0-9-]+$").unwrap().is_match(path) => get_user(event, None).await,
-        (&Method::POST, "/users") => create_user(event, None).await,
-        (&Method::GET, "/users") => search_users(event, None).await,
-        _ => {
-            println!("Unmatched route: Method: {}, URI: {}", event.method(), event.uri().path());
-            Ok(Response::builder()
-                .status(404)
-                .body("Not Found".into())
-                .expect("Failed to render response"))
-        }
+        (&Method::POST, "/users") => create_user(event, &connector).await,
+        (&Method::GET, _) if specific_user.clone().unwrap().is_match(path) => get_user(event, &connector).await,
+        (&Method::PATCH, _) if specific_user.unwrap().is_match(path) => patch_user(event, &connector).await,
+        (&Method::GET, "/users") => search_users(event, &connector).await,
+        _ => not_found()
     };
     response
 }

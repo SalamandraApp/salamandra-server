@@ -1,24 +1,28 @@
 use lambda_http::{Error, Request, Response, Body, RequestExt,};
 use lambda_http::http::StatusCode;
+use tracing::error;
 use uuid::Uuid;
 
 use salamandra_server::lib::db::users_db::lookup_user;
 use salamandra_server::lib::utils::handlers::build_resp;
-use salamandra_server::lib::db::DBPool;
+use salamandra_server::lib::db::DBConnector;
 use salamandra_server::lib::errors::DBError;
 
+/// Fetch user
+/// * Assumes user id has been previously checked
+pub async fn get_user(event: Request, connector: &DBConnector) -> Result<Response<Body>, Error> {
 
-pub async fn get_user(event: Request, test_db: Option<DBPool>) -> Result<Response<Body>, Error> {
+    // Get path parameter
+    let user_id = Uuid::parse_str(event.path_parameters().first("user_id").unwrap()).unwrap();
 
-    let user_id = match event.path_parameters().first("user_id").and_then(|s| Uuid::parse_str(s).ok()) {
-        Some(id) => id,
-        None => return Ok(build_resp(StatusCode::BAD_REQUEST, "Invalid user_id")),
-    };
-
-    match lookup_user(user_id, test_db).await {
+    // Fetch from database
+    match lookup_user(user_id, connector).await {
         Ok(user) => Ok(build_resp(StatusCode::OK, user)),
         Err(DBError::ItemNotFound(mes)) => Ok(build_resp(StatusCode::NOT_FOUND, mes)),
-        Err(_) => Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, "")),
+        Err(error) => {
+            error!("INTERNAL SERVER ERROR: {}", error);
+            Ok(build_resp(StatusCode::INTERNAL_SERVER_ERROR, ""))
+        }
     }
 }
 
@@ -33,28 +37,18 @@ mod tests {
     use salamandra_server::lib::models::user_models::User;
     use salamandra_server::lib::db::users_db::insert_user;
 
-    #[tokio::test]
-    async fn test_get_user_invalid_user_id() {
-
-        let (pool, _container) = pg_container().await;
-        let user_id = String::from("INVALID-UUID");
-        let req = Request::default();
-        let req = req.with_path_parameters(HashMap::from([("user_id".to_string(), user_id)]));
-        
-        let resp = get_user(req, Some(pool)).await;
-        assert!(resp.is_ok());
-        let response = resp.unwrap();
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    }
+    // TEST CASES
+    // * Non existing user
+    // * Existing user
 
     #[tokio::test]
     async fn test_get_user_not_found() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let user_id = Uuid::new_v4().to_string();
         let req = Request::default();
         let req = req.clone().with_path_parameters(HashMap::from([("user_id".to_string(), user_id)]));
         
-        let resp = get_user(req, Some(pool)).await;
+        let resp = get_user(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -62,14 +56,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_user_ok() {
-        let (pool, _container) = pg_container().await;
+        let (connector, _container) = pg_container().await;
         let user = User::default();
         let user_id = user.id.to_string();
         let req = Request::default();
         let req = req.clone().with_path_parameters(HashMap::from([("user_id".to_string(), user_id)]));
        
-        let _ = insert_user(&user, Some(pool.clone())).await;
-        let resp = get_user(req, Some(pool)).await;
+        let _ = insert_user(&user, &connector).await;
+        let resp = get_user(req, &connector).await;
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
